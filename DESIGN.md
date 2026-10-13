@@ -1,6 +1,6 @@
 # LeadFlow design system
 
-Visual reference: [VANTA — Real Estate Property Management SaaS](https://www.behance.net/gallery/254582983/VANTA-Real-Estate-Property-Management-SaaS-Platform) (Behance, Oleksandr Vinarskyi). We borrow its orange palette, type and component shapes, pushed to higher contrast. We do not copy its logo or name.
+Visual reference: [VANTA — Real Estate Property Management SaaS](https://www.behance.net/gallery/254582983/VANTA-Real-Estate-Property-Management-SaaS-Platform) (Behance, Oleksandr Vinarskyi). We borrow its orange palette, type and component shapes, pushed to a truer orange and higher contrast. We do not copy its logo or name.
 
 Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-card`, `text-muted-foreground`, `bg-status-won`) and never hard-code hex values in components.
 
@@ -8,18 +8,18 @@ Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-ca
 
 | Role | Token | Light | Dark | Use |
 |---|---|---|---|---|
-| Canvas | `background` | `#E9EAEE` | `#0B0B0B` | Page background. Darker than VANTA's `#F1F1F3` so white cards stand off it. |
-| Surface | `card` / `popover` | `#FFFFFF` | `#1B1B1B` | Cards, dialogs, menus, sidebar |
-| Ink | `foreground` | `#111111` | `#F5F5F7` | Headings and main content (18.9:1 / 15.8:1) |
-| Muted text | `muted-foreground` | `#4E5058` | `#ADB1BC` | Metadata, timestamps, placeholders. At least 6:1 on every surface. |
-| Primary | `primary` | `#C73A10` | `#C73A10` | Filled buttons, the active pill, links, focus ring. VANTA orange deepened for 5.2:1 with white text. |
-| Primary hover | `primary-hover` | `#A8300B` | `#A8300B` | Hover and pressed state of primary buttons |
-| Highlight | `highlight` | `#F75831` | `#F75831` | The original VANTA orange: status dots, chart series, large accent words. Not for small text on white (3.3:1). |
-| Quiet fill | `secondary` | `#E1E3EB` | `#313131` | Inactive pills, icon chips, segmented controls |
-| Hover surface | `accent` | `#F1F2F5` | `#262626` | Menu and list hover |
-| Lines | `border` / `input` | `#D3D5DE` / `#ABADB5` | white 12% / 18% | Separators; `input` is a 50% fill behind fields |
+| Canvas | `background` | `#EBE9E6` | `#0C0B0A` | Page background, so white cards stand off it |
+| Surface | `card` / `popover` | `#FFFFFF` | `#1C1A18` | Cards, dialogs, menus, sidebar |
+| Ink | `foreground` | `#141110` | `#F6F4F2` | Headings and main content (15.5:1 / 15.8:1) |
+| Muted text | `muted-foreground` | `#524D48` | `#B4AEA7` | Metadata, timestamps, placeholders. At least 6:1 on every surface. |
+| Primary | `primary` | `#C2500C` | `#C2500C` | Filled buttons, the active pill, links, focus ring. A true orange (hue 44°, not red), kept dark enough for 4.7:1 with white text. |
+| Primary hover | `primary-hover` | `#A6460A` | `#A6460A` | Hover and pressed state of primary buttons |
+| Highlight | `highlight` | `#EA6A16` | `#EA6A16` | Bright orange in the same hue: status dots, chart series, large accent words. Not for small text on white (3.2:1). |
+| Quiet fill | `secondary` | `#E3E0DC` | `#33302D` | Inactive pills, icon chips, segmented controls |
+| Hover surface | `accent` | `#F4F2F0` | `#282523` | Menu and list hover |
+| Lines | `border` / `input` | `#D6D2CD` / `#B3AEA8` | white 12% / 18% | Separators; `input` is a 50% fill behind fields |
 
-Use orange sparingly: primary actions, the current selection and state markers. Inactive controls stay grey.
+Neutrals carry a faint warm tint (chroma ≤ 0.012 toward the orange hue) so they sit with the orange instead of fighting it, but stay far from cream. Use orange sparingly: primary actions, the current selection and state markers. Inactive controls stay neutral.
 
 ### Lead statuses
 
@@ -29,10 +29,10 @@ Each status gets a coloured **dot next to its text label**. The badge itself is 
 |---|---|
 | New | `status-new` (blue `#5B7BE0`) |
 | Contacted | `status-contacted` (violet `#9B5FD6`) |
-| Qualified | `status-qualified` (amber `#C98418`) |
-| Proposal Sent | `status-proposal` (orange `#F75831`) |
+| Qualified | `status-qualified` (teal `#2A8FA0`). Kept away from amber so it can't be mistaken for the orange. |
+| Proposal Sent | `status-proposal` (orange `#EA6A16`) |
 | Won | `status-won` (green `#24964A`) |
-| Lost | `status-lost` (grey `#878992`) |
+| Lost | `status-lost` (warm grey `#8A847E`) |
 
 ## Type
 
