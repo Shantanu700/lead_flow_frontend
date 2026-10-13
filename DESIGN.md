@@ -40,12 +40,42 @@ Each status gets a coloured **dot next to its text label**. The badge itself is 
 - Large figures (counts, times) are set big and light, with a small medium-weight unit beside them, e.g. "**3** follow-ups today".
 - Use a fixed rem scale, not fluid `clamp()`.
 
-## Shape and layout
+## Shape, spacing and elevation
 
-- `--radius: 1rem`. Use `rounded-2xl` for cards and dialogs, and `rounded-full` for buttons, tabs, filter pills, badges and the search field.
-- Separate cards with space and the canvas colour rather than borders or shadows. White cards on grey need no outline.
-- Icon-only actions (expand, close) are round `size-9` buttons. Use dark ones (`bg-foreground text-background`) for the main action on a card and `secondary` ones in toolbars.
-- Status filters are a segmented pill row. The active pill is `primary`, the rest `secondary`.
+These follow the munim frontend's layout rules (`~/projects/munim_frontend/DESIGN.md` §3–5). The colours above stay LeadFlow's own.
+
+### Radius: use the scale only
+
+| Class | Value | Applies to |
+|---|---|---|
+| `rounded-xl` | 32px | Top-level panels, cards, dialogs, the drawer, the floating sidebar, the header bar |
+| `rounded-lg` | 24px | A block nested inside a card |
+| `rounded-md` | 18px | List rows, chips, small tiles, sidebar menu items, swatches |
+| `rounded-sm` | 12px | Inline badges, tiny swatches |
+| `rounded-full` | pill | Every button, toggle, status pill and filter |
+
+`rounded-2xl`, `rounded-3xl` and `rounded-4xl` are capped at 32px, so an oversized radius can't creep in through a stock shadcn class. A child's radius is always smaller than its parent's.
+
+### Spacing
+
+- **6px between panels, always.** Use `gap-panel` between cards and grid columns, and `p-panel` around the shell. Never 8, 12 or 16px between panels.
+- The shell is the floating sidebar plus a content column: `flex flex-col gap-panel p-panel md:pl-0`. The sidebar's own `p-panel` provides the gap on its side.
+- Card padding is `p-6`; the header bar is `px-5 py-3.5`; list rows are `px-4 py-3`.
+- Sibling groups use `flex`/`grid` with `gap`, never margins between siblings.
+
+### Elevation
+
+- There is one shadow, `shadow-card`, and only top-level panels get it (cards, header, sidebar, drawer). Nested blocks, rows and buttons stay flat.
+- Containers have no outline borders. Surface colour separates them.
+
+### Overlays
+
+- **Dialog / modal (alert-dialog):** a 32px panel centred over a blurred backdrop, with pill actions.
+- **Drawer:** floats 6px in from the screen edge (`--drawer-inset: var(--spacing-panel)`) as a rounded `shadow-card` panel. It can slide in from the side (`swipeDirection="right"`) or the bottom.
+- **Tooltip:** a small ink pill (`bg-foreground text-background`).
+- Icon-only actions are round `size-9` buttons.
+
+The sidebar keeps the stock shadcn animations (`duration-200 ease-linear`) unchanged.
 
 ## Motion
 
