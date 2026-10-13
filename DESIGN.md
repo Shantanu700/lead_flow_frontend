@@ -1,36 +1,39 @@
 # LeadFlow design system
 
-Visual reference: [VANTA — Real Estate Property Management SaaS](https://www.behance.net/gallery/254582983/VANTA-Real-Estate-Property-Management-SaaS-Platform) (Behance, Oleksandr Vinarskyi). We borrow its palette, type and component shapes. We do not copy its logo or name.
+Colour: LeadFlow's own forest-green palette. Type and component shapes were first taken from [VANTA — Real Estate Property Management SaaS](https://www.behance.net/gallery/254582983/VANTA-Real-Estate-Property-Management-SaaS-Platform) (Behance, Oleksandr Vinarskyi). We do not copy its logo or name.
 
 Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-card`, `text-muted-foreground`, `bg-status-won`) and never hard-code hex values in components.
 
 ## Colour
 
-| Role | Token | Value | Use |
-|---|---|---|---|
-| Canvas | `background` | `#F1F1F3` | Page background. Content sits on white cards above it. |
-| Surface | `card` / `popover` | `#FFFFFF` | Cards, dialogs, menus |
-| Ink | `foreground` | `#1B1B1B` | Text and dark icon buttons |
-| Brand | `brand` | `#F75831` | Status dots, chart series, focus rings, large accent words |
-| Primary | `primary` | `#D24015` | Filled buttons and the active tab or pill. This is the brand orange deepened so white text reaches 4.5:1. |
-| Quiet fill | `secondary` | `#E6E8F1` | Inactive pills, icon chips, segmented controls |
-| Muted text | `muted-foreground` | `#64666F` | Secondary lines and placeholders (5:1). The reference's `#878992` fails contrast for text, so it appears only as the `status-lost` dot. |
-| Lines | `border` / `input` | `#E6E8F1` / `#C6C6C8` | Hairlines, input outlines |
+| Role | Token | Light | Dark | Use |
+|---|---|---|---|---|
+| Canvas | `background` | `#F3F4F2` | `#121514` | Page background. Content sits on cards above it. |
+| Surface | `card` / `popover` | `#FFFFFF` | `#171A19` | Lead cards, dialogs, inputs, menus, sidebar |
+| Text | `foreground` | `#252B27` | `#EEF0EB` | Headings and main content |
+| Muted text | `muted-foreground` | `#5F665F` | `#A3AAA4` | Metadata, timestamps, placeholders. At least 4.8:1 on every surface. |
+| Primary | `primary` | `#356B53` | `#5FA584` | Primary buttons, selected controls, links, focus ring |
+| Primary hover | `primary-hover` | `#28543F` | `#74B595` | Hover and pressed state of primary buttons |
+| On primary | `primary-foreground` | `#FFFFFF` | `#0F1A14` | Text on primary. Dark mode uses dark text because white on the lighter green fails (2.9:1). |
+| Quiet fill | `secondary` | `#E7E9E4` | `#252A27` | Secondary panels, filter backgrounds, inactive pills |
+| Hover surface | `accent` | `#EEF0EB` | `#252A27` | Menu and list hover |
+| Lines | `border` / `input` | `#DCDDD5` / `#CFD2CA` | white 10% / 15% | Separators, input outlines |
+| Highlight | `highlight` | `#D8B982` | `#D8B982` | Small premium touches: dots, icons, tiny badges. **Never text on light surfaces** (1.9:1). |
 
-Use orange sparingly: primary actions, the current selection and state markers. Inactive controls stay grey. Dark mode swaps in `#121212` for the canvas, `#1B1B1B` for cards and `#313131` for fills, matching the reference's dark cards.
+Green marks action and selection only. Inactive controls stay neutral. The canvas has a faint green-grey tint rather than the original warm `#F5F3ED`, so it doesn't read as generic beige.
 
 ### Lead statuses
 
-Each status gets a coloured **dot next to its text label**. The badge itself is a neutral pill (`bg-secondary text-foreground`), so the colour is never the only cue and the text always passes contrast.
+Each status gets a coloured **dot next to its text label**. The badge itself is a neutral pill (`bg-secondary text-foreground`), so the colour is never the only cue and the text always passes contrast. Every dot is at least 3:1 against cards in both modes.
 
 | Status | Token |
 |---|---|
-| New | `status-new` (blue) |
-| Contacted | `status-contacted` (violet) |
-| Qualified | `status-qualified` (amber) |
-| Proposal Sent | `status-proposal` (brand orange) |
-| Won | `status-won` (green) |
-| Lost | `status-lost` (grey) |
+| New | `status-new` (blue `#5B7BE0`) |
+| Contacted | `status-contacted` (violet `#9B5FD6`) |
+| Qualified | `status-qualified` (teal `#2A8FA0`) |
+| Proposal Sent | `status-proposal` (orange `#E2683C`) |
+| Won | `status-won` (gold `#A8842F`). Deliberately not green, so a won lead never looks like a primary action. |
+| Lost | `status-lost` (grey `#878C86`) |
 
 ## Type
 

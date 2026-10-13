@@ -29,7 +29,7 @@ No test runner is set up yet.
 
 ## Stack and conventions
 
-- **Design system: read `DESIGN.md` before building UI.** It covers the palette, lead status colours, Plus Jakarta Sans type rules and the pill/card shapes. All tokens are in `app/globals.css`.
+- **Design system: read `DESIGN.md` before building UI.** It covers the green palette, lead status colours, Plus Jakarta Sans type rules, munim-style spacing and radius, and the `rounded-control` pill rule. All tokens are in `app/globals.css`.
 - Next.js 16.4 App Router (`app/`), React 19.3, TypeScript, path alias `@/*` → repo root.
 - Tailwind CSS v4 is configured in CSS only (`app/globals.css` using `@theme inline`; there is no `tailwind.config`). Dark mode uses the `.dark` class via `next-themes`. `components/theme-provider.tsx` also binds the `d` key to toggle the theme.
 - UI components come from shadcn (`components.json`, style `base-luma`) and are built on **Base UI** (`@base-ui/react`), not Radix. Add them with `bunx shadcn add <component>`, which writes to `components/ui/`. Icons come from `lucide-react`.
