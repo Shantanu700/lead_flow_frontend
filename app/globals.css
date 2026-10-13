@@ -63,74 +63,74 @@
 }
 
 :root {
-    /* LeadFlow palette: true orange on warm-tinted neutrals (see DESIGN.md) */
-    --background: oklch(0.935 0.005 78.3); /* #EBE9E6 canvas — cards stand off it */
-    --foreground: oklch(0.181 0.005 39.3); /* #141110 ink */
+    /* LeadFlow palette: the VANTA reference (see DESIGN.md) */
+    --background: oklch(0.959 0.003 286.3); /* #F1F1F3 canvas */
+    --foreground: oklch(0.222 0 0); /* #1B1B1B ink */
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.181 0.005 39.3);
+    --card-foreground: oklch(0.222 0 0);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.181 0.005 39.3);
-    --primary: oklch(0.573 0.161 44.1); /* #C2500C — the most orange shade that keeps 4.5:1 with white (4.7:1) */
-    --primary-hover: oklch(0.514 0.141 45.3); /* #A6460A */
+    --popover-foreground: oklch(0.222 0 0);
+    --primary: oklch(0.58 0.189 35.5); /* #D24015 — #F75831 deepened for 4.5:1 with white text */
+    --primary-hover: oklch(0.52 0.169 36.1); /* #B5370F */
     --primary-foreground: oklch(1 0 0);
-    --secondary: oklch(0.908 0.006 75.4); /* #E3E0DC */
-    --secondary-foreground: oklch(0.181 0.005 39.3);
-    --muted: oklch(0.935 0.005 78.3);
-    --muted-foreground: oklch(0.423 0.011 67.5); /* #524D48, 6.3:1 even on secondary */
-    --accent: oklch(0.962 0.003 67.8); /* #F4F2F0 hover surface */
-    --accent-foreground: oklch(0.181 0.005 39.3);
-    --highlight: oklch(0.67 0.179 46.7); /* #EA6A16 bright orange — dots, charts, large accents */
+    --secondary: oklch(0.932 0.012 276.1); /* #E6E8F1 */
+    --secondary-foreground: oklch(0.222 0 0);
+    --muted: oklch(0.959 0.003 286.3);
+    --muted-foreground: oklch(0.512 0.014 275.9); /* #64666F, 5:1 on canvas */
+    --accent: oklch(0.959 0.003 286.3);
+    --accent-foreground: oklch(0.222 0 0);
+    --highlight: oklch(0.669 0.202 34.8); /* #F75831 VANTA orange — dots, charts, large accents */
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.866 0.008 73.7); /* #D6D2CD */
-    --input: oklch(0.753 0.01 72.6); /* #B3AEA8, used as a 50% fill */
-    --ring: oklch(0.573 0.161 44.1);
-    --chart-1: oklch(0.67 0.179 46.7);
-    --chart-2: oklch(0.311 0.007 67.6);
+    --border: oklch(0.932 0.012 276.1); /* #E6E8F1 */
+    --input: oklch(0.827 0.003 286.3); /* #C6C6C8 */
+    --ring: oklch(0.669 0.202 34.8);
+    --chart-1: oklch(0.669 0.202 34.8);
+    --chart-2: oklch(0.313 0 0);
     --chart-3: oklch(0.594 0.15 149.7);
     --chart-4: oklch(0.608 0.157 268.3);
     --chart-5: oklch(0.605 0.179 304.9);
     /* Lead statuses: dot colour only; the status text is always shown */
     --status-new: oklch(0.608 0.157 268.3); /* #5B7BE0 */
     --status-contacted: oklch(0.605 0.179 304.9); /* #9B5FD6 */
-    --status-qualified: oklch(0.601 0.092 211.3); /* #2A8FA0 teal, clear of the orange family */
-    --status-proposal: oklch(0.67 0.179 46.7); /* #EA6A16 */
+    --status-qualified: oklch(0.669 0.138 70.9); /* #C98418 */
+    --status-proposal: oklch(0.669 0.202 34.8); /* #F75831 */
     --status-won: oklch(0.594 0.15 149.7); /* #24964A */
-    --status-lost: oklch(0.617 0.011 67.6); /* #8A847E */
+    --status-lost: oklch(0.631 0.014 276); /* #878992 */
     --radius: 1.5rem;
-    --shadow-card: 0 1px 2px rgb(20 17 16 / 0.05), 0 8px 24px rgb(20 17 16 / 0.07);
+    --shadow-card: 0 1px 2px rgb(27 27 27 / 0.04), 0 8px 24px rgb(27 27 27 / 0.05);
     --sidebar: oklch(1 0 0);
-    --sidebar-foreground: oklch(0.181 0.005 39.3);
-    --sidebar-primary: oklch(0.573 0.161 44.1);
+    --sidebar-foreground: oklch(0.222 0 0);
+    --sidebar-primary: oklch(0.58 0.189 35.5);
     --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(0.962 0.003 67.8);
-    --sidebar-accent-foreground: oklch(0.181 0.005 39.3);
-    --sidebar-border: oklch(0.866 0.008 73.7);
-    --sidebar-ring: oklch(0.573 0.161 44.1);
+    --sidebar-accent: oklch(0.959 0.003 286.3);
+    --sidebar-accent-foreground: oklch(0.222 0 0);
+    --sidebar-border: oklch(0.932 0.012 276.1);
+    --sidebar-ring: oklch(0.669 0.202 34.8);
 }
 
 .dark {
-    --background: oklch(0.15 0.003 67.5); /* #0C0B0A */
-    --foreground: oklch(0.968 0.003 67.8); /* #F6F4F2 */
-    --card: oklch(0.219 0.005 67.6); /* #1C1A18 */
-    --card-foreground: oklch(0.968 0.003 67.8);
-    --popover: oklch(0.219 0.005 67.6);
-    --popover-foreground: oklch(0.968 0.003 67.8);
-    --secondary: oklch(0.311 0.007 67.6); /* #33302D */
-    --secondary-foreground: oklch(0.968 0.003 67.8);
-    --muted: oklch(0.267 0.006 56.1); /* #282523 */
-    --muted-foreground: oklch(0.754 0.012 71.9); /* #B4AEA7 */
-    --accent: oklch(0.267 0.006 56.1);
-    --accent-foreground: oklch(0.968 0.003 67.8);
+    --background: oklch(0.178 0 0); /* #121212 */
+    --foreground: oklch(0.959 0.003 286.3);
+    --card: oklch(0.222 0 0); /* #1B1B1B */
+    --card-foreground: oklch(0.959 0.003 286.3);
+    --popover: oklch(0.222 0 0);
+    --popover-foreground: oklch(0.959 0.003 286.3);
+    --secondary: oklch(0.313 0 0); /* #313131 */
+    --secondary-foreground: oklch(0.959 0.003 286.3);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.705 0.022 267.2); /* #9AA0AE */
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.959 0.003 286.3);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 12%);
-    --input: oklch(1 0 0 / 18%);
-    --chart-2: oklch(0.866 0.008 73.7);
-    --sidebar: oklch(0.219 0.005 67.6);
-    --sidebar-foreground: oklch(0.968 0.003 67.8);
-    --sidebar-accent: oklch(0.267 0.006 56.1);
-    --sidebar-accent-foreground: oklch(0.968 0.003 67.8);
-    --sidebar-border: oklch(1 0 0 / 12%);
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 28px rgb(0 0 0 / 0.32);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --chart-2: oklch(0.827 0.003 286.3);
+    --sidebar: oklch(0.222 0 0);
+    --sidebar-foreground: oklch(0.959 0.003 286.3);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.959 0.003 286.3);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.28);
 }
 
 /* The one elevation: top-level panels only, never nested blocks */
