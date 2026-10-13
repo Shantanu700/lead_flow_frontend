@@ -42,7 +42,7 @@ export function TeamSwitcher({
             render={
               <SidebarMenuButton
                 size="lg"
-                className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+                className="rounded-full data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
               />
             }
           >
