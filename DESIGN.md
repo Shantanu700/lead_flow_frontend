@@ -50,9 +50,10 @@ These follow the munim frontend's layout rules (`~/projects/munim_frontend/DESIG
 |---|---|---|
 | `rounded-xl` | 32px | Top-level panels, cards, dialogs, the drawer, the floating sidebar, the header bar |
 | `rounded-lg` | 24px | A block nested inside a card |
-| `rounded-md` | 18px | List rows, chips, small tiles, sidebar menu items, swatches |
+| `rounded-md` | 18px | List rows, chips, small tiles, swatches |
 | `rounded-sm` | 12px | Inline badges, tiny swatches |
-| `rounded-full` | pill | Every button, toggle, status pill and filter |
+| `rounded-control` | pill | **Every interactive surface by default:** buttons, sidebar menu items and actions, dropdown items. Its hover highlight is a full pill. |
+| `rounded-full` | pill | Status pills, filters, avatars, circles |
 
 `rounded-2xl`, `rounded-3xl` and `rounded-4xl` are capped at 32px, so an oversized radius can't creep in through a stock shadcn class. A child's radius is always smaller than its parent's.
 

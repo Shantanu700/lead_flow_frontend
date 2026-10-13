@@ -55,6 +55,8 @@
     --radius-3xl: 2rem;
     --radius-4xl: 2rem;
     --radius-pill: 999px;
+    /* Every interactive surface (buttons, menu items, nav rows): rounded-control */
+    --radius-control: var(--radius-pill);
     /* The only gap between panels and cards: gap-panel, p-panel */
     --spacing-panel: 6px;
 }
