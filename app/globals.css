@@ -70,8 +70,8 @@
     --card-foreground: oklch(0.222 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.222 0 0);
-    --primary: oklch(0.58 0.189 35.5); /* #D24015 — #F75831 deepened for 4.5:1 with white text */
-    --primary-hover: oklch(0.52 0.169 36.1); /* #B5370F */
+    --primary: oklch(0.669 0.202 34.8); /* #F75831 — exact reference orange. White text is 3.3:1 (below AA 4.5:1 for small text), chosen deliberately */
+    --primary-hover: oklch(0.615 0.193 35.2); /* #E04A22 */
     --primary-foreground: oklch(1 0 0);
     --secondary: oklch(0.932 0.012 276.1); /* #E6E8F1 */
     --secondary-foreground: oklch(0.222 0 0);
@@ -100,7 +100,7 @@
     --shadow-card: 0 1px 2px rgb(27 27 27 / 0.04), 0 8px 24px rgb(27 27 27 / 0.05);
     --sidebar: oklch(1 0 0);
     --sidebar-foreground: oklch(0.222 0 0);
-    --sidebar-primary: oklch(0.58 0.189 35.5);
+    --sidebar-primary: oklch(0.669 0.202 34.8);
     --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: oklch(0.959 0.003 286.3);
     --sidebar-accent-foreground: oklch(0.222 0 0);

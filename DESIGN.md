@@ -12,8 +12,8 @@ Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-ca
 | Surface | `card` / `popover` | `#FFFFFF` | `#1B1B1B` | Cards, dialogs, menus, sidebar |
 | Ink | `foreground` | `#1B1B1B` | `#F1F1F3` | Headings and main content |
 | Muted text | `muted-foreground` | `#64666F` | `#9AA0AE` | Secondary lines and placeholders (5:1). The reference's `#878992` fails contrast for text, so it appears only as the `status-lost` dot. |
-| Primary | `primary` | `#D24015` | `#D24015` | Filled buttons, the active pill. The reference orange deepened so white text reaches 4.5:1. |
-| Primary hover | `primary-hover` | `#B5370F` | `#B5370F` | Hover and pressed state of primary buttons |
+| Primary | `primary` | `#F75831` | `#F75831` | Filled buttons, the active pill. The exact reference orange. **White text on it is 3.3:1, below WCAG AA (4.5:1) for small text.** This is a deliberate brand choice; keep labels short and `font-medium`, and never put body copy on it. |
+| Primary hover | `primary-hover` | `#E04A22` | `#E04A22` | Hover and pressed state of primary buttons |
 | Highlight | `highlight` | `#F75831` | `#F75831` | The reference orange: status dots, chart series, focus rings, large accent words |
 | Quiet fill | `secondary` | `#E6E8F1` | `#313131` | Inactive pills, icon chips, segmented controls |
 | Lines | `border` / `input` | `#E6E8F1` / `#C6C6C8` | white 10% / 15% | Hairlines; `input` is a 50% fill behind fields |
