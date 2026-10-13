@@ -1,26 +1,28 @@
 # LeadFlow design system
 
-Colour: LeadFlow's own forest-green palette. Type and component shapes were first taken from [VANTA — Real Estate Property Management SaaS](https://www.behance.net/gallery/254582983/VANTA-Real-Estate-Property-Management-SaaS-Platform) (Behance, Oleksandr Vinarskyi). We do not copy its logo or name.
+Colour: dark emerald, forest green and cream, with a champagne gold taken from the same reference board. Type and component shapes were first taken from [VANTA — Real Estate Property Management SaaS](https://www.behance.net/gallery/254582983/VANTA-Real-Estate-Property-Management-SaaS-Platform) (Behance, Oleksandr Vinarskyi). We do not copy its logo or name.
 
 Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-card`, `text-muted-foreground`, `bg-status-won`) and never hard-code hex values in components.
 
 ## Colour
 
+Source palette: Dark Emerald `#02110C`, Forest/Olive Green `#1A422F`, Cream Beige `#F3EBD6`. Light mode is cream with emerald ink; dark mode is emerald with cream ink.
+
 | Role | Token | Light | Dark | Use |
 |---|---|---|---|---|
-| Canvas | `background` | `#F3F4F2` | `#121514` | Page background. Content sits on cards above it. |
-| Surface | `card` / `popover` | `#FFFFFF` | `#171A19` | Lead cards, dialogs, inputs, menus, sidebar |
-| Text | `foreground` | `#252B27` | `#EEF0EB` | Headings and main content |
-| Muted text | `muted-foreground` | `#5F665F` | `#A3AAA4` | Metadata, timestamps, placeholders. At least 4.8:1 on every surface. |
-| Primary | `primary` | `#356B53` | `#5FA584` | Primary buttons, selected controls, links, focus ring |
-| Primary hover | `primary-hover` | `#28543F` | `#74B595` | Hover and pressed state of primary buttons |
-| On primary | `primary-foreground` | `#FFFFFF` | `#0F1A14` | Text on primary. Dark mode uses dark text because white on the lighter green fails (2.9:1). |
-| Quiet fill | `secondary` | `#E7E9E4` | `#252A27` | Secondary panels, filter backgrounds, inactive pills |
-| Hover surface | `accent` | `#EEF0EB` | `#252A27` | Menu and list hover |
-| Lines | `border` / `input` | `#DCDDD5` / `#CFD2CA` | white 10% / 15% | Separators, input outlines |
-| Highlight | `highlight` | `#D8B982` | `#D8B982` | Small premium touches: dots, icons, tiny badges. **Never text on light surfaces** (1.9:1). |
+| Canvas | `background` | `#F3EBD6` cream | `#02110C` emerald | Page background. Content sits on cards above it. |
+| Surface | `card` / `popover` | `#FFFDF7` | `#0A1F17` | Lead cards, dialogs, inputs, menus, sidebar |
+| Text | `foreground` | `#02110C` | `#F3EBD6` | Headings and main content |
+| Muted text | `muted-foreground` | `#55604F` | `#A7B0A0` | Metadata, timestamps, placeholders. At least 5:1 on every surface. |
+| Primary | `primary` | `#1A422F` | `#5FA27D` | Primary buttons, selected controls, links, focus ring. Dark mode lifts it because forest green disappears on emerald. |
+| Primary hover | `primary-hover` | `#0F2F20` | `#76B593` | Hover and pressed state of primary buttons |
+| On primary | `primary-foreground` | `#F3EBD6` cream | `#02110C` | Text on primary (9.5:1 / 6.4:1) |
+| Quiet fill | `secondary` | `#E9E0C8` | `#143024` | Secondary panels, filter backgrounds, inactive pills |
+| Hover surface | `accent` | `#F7F1E2` | `#143024` | Menu and list hover |
+| Lines | `border` / `input` | `#E2D8BE` / `#D3C9AE` | cream 10% / 15% | Separators, input outlines |
+| Highlight | `highlight` | `#C2A878` | `#C2A878` | Champagne gold for small premium touches. **Decorative only on light** (2.3:1); fine as text on dark (7.5:1). |
 
-Green marks action and selection only. Inactive controls stay neutral. The canvas has a faint green-grey tint rather than the original warm `#F5F3ED`, so it doesn't read as generic beige.
+Green marks action and selection only. Inactive controls stay cream or neutral.
 
 ### Lead statuses
 
