@@ -67,7 +67,7 @@ function Field({
   )
 }
 
-const FIELD = "h-11 px-4"
+const FIELD = "h-11 px-4 md:text-base"
 
 function PasswordInput({
   id,
@@ -108,6 +108,75 @@ function PasswordInput({
         {visible ? "Hide" : "Show"}
       </Button>
     </div>
+  )
+}
+
+// Illustrative only: example leads showing what the app looks like inside.
+const PREVIEW = [
+  {
+    name: "Priya Sharma",
+    company: "Example Traders",
+    status: "Proposal Sent",
+    dot: "bg-status-proposal",
+    time: "11:30 am",
+  },
+  {
+    name: "Rahul Verma",
+    company: "Sample Foods",
+    status: "Qualified",
+    dot: "bg-status-qualified",
+    time: "2:00 pm",
+  },
+  {
+    name: "Ananya Iyer",
+    company: "Demo Textiles",
+    status: "Contacted",
+    dot: "bg-status-contacted",
+    time: "4:15 pm",
+  },
+] as const
+
+const RISE =
+  "animate-in duration-500 fill-mode-both fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
+
+function FollowUpsPreview() {
+  return (
+    <figure
+      data-ui
+      aria-label="Example of the Today's Follow-ups list, with sample leads"
+      className="flex flex-col gap-2"
+    >
+      <figcaption
+        className={`mb-1 flex items-baseline justify-between ${RISE} delay-150`}
+      >
+        <span className="text-lg leading-tight font-normal">
+          Today&apos;s Follow-ups
+          <span className="block text-muted-foreground">Example data</span>
+        </span>
+        <span className="text-sm text-muted-foreground">3 scheduled</span>
+      </figcaption>
+      {PREVIEW.map((lead, i) => (
+        <div
+          key={lead.name}
+          className={`flex items-center gap-4 rounded-md bg-card px-4 py-3 ${RISE}`}
+          style={{ animationDelay: `${225 + i * 75}ms` }}
+        >
+          <div className="min-w-0 flex-1 text-sm leading-tight">
+            <span className="block truncate font-medium">{lead.name}</span>
+            <span className="block truncate text-muted-foreground">
+              {lead.company}
+            </span>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium">
+            <span className={`size-2 rounded-full ${lead.dot}`} />
+            {lead.status}
+          </span>
+          <span className="w-16 text-right text-sm text-muted-foreground tabular-nums">
+            {lead.time}
+          </span>
+        </div>
+      ))}
+    </figure>
   )
 }
 
@@ -187,27 +256,25 @@ export default function AuthPage() {
   return (
     <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-8">
       <div className="grid w-full max-w-5xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:grid-cols-2">
-        {/* Brand panel: always dark, whatever the page theme. */}
-        <section className="dark hidden flex-col justify-between gap-10 rounded-lg bg-background p-10 text-foreground lg:flex">
-          <Logo />
-          <div className="flex flex-col gap-4">
-            <h1 className="text-4xl leading-tight font-light text-balance">
-              Every lead, every follow-up
-              <span className="block text-muted-foreground">
-                on one screen.
-              </span>
+        {/* Brand panel: always dark, whatever the page theme. It shows the
+            product itself, a "Today's Follow-ups" fragment, instead of decoration. */}
+        <section className="dark hidden flex-col justify-center gap-10 rounded-lg bg-background p-10 text-foreground lg:flex">
+          <div className="flex flex-col gap-5">
+            <h1 className="animate-in text-6xl leading-[1.02] font-light tracking-tight duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
+              Every lead,
+              <span className="block text-muted-foreground">one screen.</span>
             </h1>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Keep lead details, sales status, discussion history and the next
-              follow-up together, without a separate page for every lead.
+            <p className="max-w-sm animate-in text-base leading-relaxed text-foreground/80 delay-75 duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
+              Lead details, sales status, every discussion and the next
+              follow-up, without a page for each lead.
             </p>
           </div>
+          <FollowUpsPreview />
         </section>
 
         <section className="flex min-w-0 flex-col gap-8 p-6 sm:p-10">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* On small screens the brand panel is hidden; the logo gets its own row. */}
-            <div className="basis-full lg:hidden">
+            <div className="basis-full">
               <Logo />
             </div>
             <div
@@ -230,12 +297,15 @@ export default function AuthPage() {
             <ModeToggle />
           </div>
 
-          <h2 className="text-2xl leading-tight font-light">
+          <h2 className={`text-2xl leading-tight font-light ${RISE} delay-75`}>
             {copy.title}
             <span className="block text-muted-foreground">{copy.subtitle}</span>
           </h2>
 
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <form
+            onSubmit={onSubmit}
+            className={`flex flex-col gap-4 ${RISE} delay-150`}
+          >
             {isRegister && (
               <Field id="name" label="Full name">
                 <Input
@@ -287,7 +357,7 @@ export default function AuthPage() {
             </Button>
           </form>
 
-          <p className="text-sm text-muted-foreground">
+          <p className={`text-sm text-muted-foreground ${RISE} delay-200`}>
             {copy.switchPrompt}{" "}
             <button
               type="button"

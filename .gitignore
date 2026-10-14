@@ -40,3 +40,6 @@ next-env.d.ts
 
 # local HTTPS certs (mkcert) for `bun dev`
 certificates/
+
+# design-taste-frontend inspector output
+.taste-skill/
