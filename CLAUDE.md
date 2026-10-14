@@ -19,7 +19,8 @@ Spec rules that are easy to get wrong:
 
 The package manager is Bun (`bun.lock`).
 
-- `bun dev`: dev server (also rewrites `AGENTS.md`)
+- `bun dev`: HTTPS dev server at `https://localhost:3000` (also rewrites `AGENTS.md`). It needs an mkcert certificate in `certificates/`, which is gitignored: `mkcert -cert-file certificates/localhost.pem -key-file certificates/localhost-key.pem localhost 127.0.0.1 ::1`. Run `mkcert -install` once so browsers trust it.
+- `bun run openapi-ts`: regenerates the typed API client in `src/client/` from the running backend schema (`https://localhost:8011/api/schema/`). Re-run it after any API change, and never edit `src/client/` by hand. ESLint and Prettier ignore it.
 - `bun run build` / `bun start`
 - `bun run lint`: ESLint 9 flat config (`eslint.config.mjs`, next core-web-vitals + typescript)
 - `bun run typecheck`: `tsc --noEmit`
@@ -34,4 +35,14 @@ No test runner is set up yet.
 - Tailwind CSS v4 is configured in CSS only (`app/globals.css` using `@theme inline`; there is no `tailwind.config`). Dark mode uses the `.dark` class via `next-themes`. `components/theme-provider.tsx` also binds the `d` key to toggle the theme.
 - UI components come from shadcn (`components.json`, style `base-luma`) and are built on **Base UI** (`@base-ui/react`), not Radix. Add them with `bunx shadcn add <component>`, which writes to `components/ui/`. Icons come from `lucide-react`.
 - `cn` is re-exported from the `cn` package in `lib/utils.ts`. Variants use `class-variance-authority`.
+- **API and auth:**
+  - Import SDK functions from `@/src/client/sdk.gen`. `lib/api.ts` must be imported first (it is imported for its side effects). It sets the base URL from `NEXT_PUBLIC_API_URL` in `.env.local` (gitignored), sends credentials, and adds `X-CSRFToken` to POST, PUT, PATCH and DELETE requests.
+  - Call `refreshCsrf()` after login or logout, because Django rotates the token.
+  - `describeApiError()` turns API errors into one sentence. Errors and results are shown as Sonner toasts (`<Toaster>` is in `app/layout.tsx`).
+  - The backend uses Django sessions with email login. The frontend and API are both HTTPS on `localhost`, so the browser treats them as the same site and the session cookie works.
+- **Routes:**
+  - `/auth` is a single page with a Log in / Register toggle.
+  - `app/dashboard/layout.tsx` is the auth guard: it calls `GET /core/login/` and sends signed-out users to `/auth`. It provides the user through `useSession()` (`components/session.tsx`).
+  - `/` redirects to `/dashboard`.
+  - There is no `proxy.ts`, because only the API can confirm a session.
 - Prettier settings: no semicolons, double quotes, `trailingComma: es5`. It sorts classes inside `cn(...)` and `cva(...)`.

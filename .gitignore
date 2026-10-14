@@ -37,3 +37,6 @@ pnpm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local HTTPS certs (mkcert) for `bun dev`
+certificates/
