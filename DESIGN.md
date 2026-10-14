@@ -15,6 +15,7 @@ Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-ca
 | Primary | `primary` | `#F75831` | `#F75831` | Filled buttons, the active pill. The exact reference orange. **White text on it is 3.3:1, below WCAG AA (4.5:1) for small text.** This is a deliberate brand choice; keep labels short and `font-medium`, and never put body copy on it. |
 | Primary hover | `primary-hover` | `#E04A22` | `#E04A22` | Hover and pressed state of primary buttons |
 | Highlight | `highlight` | `#F75831` | `#F75831` | The reference orange: status dots, chart series, focus rings, large accent words |
+| Brand surface | `brand-surface` | `#E5532F` | `#E5532F` | Large orange fields such as the `/auth` brand panel. It is the brand orange deepened 8% towards ink, so a big area doesn't glare. Use `brand-ink` text on it (4.6:1); muted ink at 70% only for 24px+ text (3.1:1). Small orange elements stay `primary`. |
 | Brand ink | `brand-ink` | `#1B1B1B` | `#1B1B1B` | Text on large orange surfaces such as the `/auth` brand panel (5.25:1). Unlike `foreground`, it stays dark in dark mode. Large text may use white on orange (3.3:1, large only). |
 | Quiet fill | `secondary` | `#E6E8F1` | `#313131` | Inactive pills, icon chips, segmented controls |
 | Lines | `border` / `input` | `#E6E8F1` / `#C6C6C8` | white 10% / 15% | Hairlines; `input` is a 50% fill behind fields |
@@ -88,4 +89,5 @@ Use 150–250 ms on state changes: hover, the active pill, the dialog opening, a
 - **Animated properties:** only transform, opacity and clip-path. The one exception is collapsing a section, which uses grid rows.
 - **Segmented toggle:** the active pill is a styled copy of the labels clipped to the active half. The clip slides (250ms ease-in-out), so the fill and the text colour change together. See `/auth`.
 - **Swapping text** (titles, button labels): both versions sit in one grid cell and crossfade with a 4px rise (200ms ease-out). The hidden one is `inert`.
-- **Fields that appear or disappear:** grid rows 0fr→1fr plus opacity (200ms ease-out). Collapsed inputs are `disabled`, so they skip validation.
+- **Fields or rows that appear or disappear:** grid rows 0fr→1fr plus opacity over 400ms on `ease-drawer` (`cubic-bezier(0.32, 0.72, 0, 1)`), a long settling glide, so a card changing size feels calm rather than snappy. Collapsed inputs are `disabled`, so they skip validation.
+- **Panels that change height** (such as the `/auth` brand panel) use `justify-between` and reveal extra content, so the new space fills with something rather than leaving a gap.

@@ -17,6 +17,7 @@
     --color-sidebar: var(--sidebar);
     --color-highlight: var(--highlight);
     --color-brand-ink: var(--brand-ink);
+    --color-brand-surface: var(--brand-surface);
     --color-primary-hover: var(--primary-hover);
     --color-status-new: var(--status-new);
     --color-status-contacted: var(--status-contacted);
@@ -65,6 +66,8 @@
        ease-out for things entering/leaving, ease-in-out for on-screen movement. */
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    /* Long, settling glide (iOS drawer curve) for size changes that should feel calm. */
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root {
@@ -86,6 +89,9 @@
     --accent-foreground: oklch(0.222 0 0);
     /* Text on large orange (brand) surfaces: 5.25:1. Not redefined in .dark, so it stays ink in both themes. */
     --brand-ink: oklch(0.222 0 0);
+    /* Large orange fields (the /auth brand panel): the brand orange deepened 8%
+       towards ink, so a big area doesn't glare. #E5532F; ink on it 4.6:1. */
+    --brand-surface: oklch(0.634 0.188 34.9);
     --highlight: oklch(0.669 0.202 34.8); /* #F75831 VANTA orange — dots, charts, large accents */
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.932 0.012 276.1); /* #E6E8F1 */

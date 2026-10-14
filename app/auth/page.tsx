@@ -162,7 +162,7 @@ function Reveal({
     <div
       inert={!open}
       className={cn(
-        "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-opacity",
+        "grid transition-[grid-template-rows,opacity] duration-400 ease-drawer motion-reduce:transition-opacity",
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       )}
     >
@@ -199,47 +199,104 @@ const PREVIEW = [
   },
 ] as const
 
+// Shown when the register form makes the card taller, so the extra height
+// fills with content instead of an empty gap.
+const PREVIEW_MORE = [
+  {
+    name: "Meera Nair",
+    company: "Sample Exports",
+    status: "New",
+    dot: "bg-status-new",
+    time: "5:00 pm",
+  },
+  {
+    name: "Vikram Singh",
+    company: "Demo Motors",
+    status: "Qualified",
+    dot: "bg-status-qualified",
+    time: "6:30 pm",
+  },
+] as const
+
 const RISE =
   "animate-in duration-500 fill-mode-both fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
 
-function FollowUpsPreview() {
+type Lead = (typeof PREVIEW)[number] | (typeof PREVIEW_MORE)[number]
+
+function PreviewRow({
+  lead,
+  className,
+  style,
+}: {
+  lead: Lead
+  className?: string
+  style?: React.CSSProperties
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-4 rounded-md bg-brand-ink/85 px-4 py-3",
+        className
+      )}
+      style={style}
+    >
+      <div className="min-w-0 flex-1 text-sm leading-tight">
+        <span className="block truncate font-medium">{lead.name}</span>
+        <span className="block truncate text-muted-foreground">
+          {lead.company}
+        </span>
+      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium">
+        <span className={`size-2 rounded-full ${lead.dot}`} />
+        {lead.status}
+      </span>
+      <span className="w-16 text-right text-sm text-muted-foreground tabular-nums">
+        {lead.time}
+      </span>
+    </div>
+  )
+}
+
+function FollowUpsPreview({ mode }: { mode: Mode }) {
   return (
     <figure
       data-ui
       aria-label="Example of the Today's Follow-ups list, with sample leads"
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-3"
     >
       <figcaption
-        className={`mb-1 flex items-baseline justify-between ${RISE} delay-150`}
+        className={`flex items-baseline justify-between ${RISE} delay-150`}
       >
         <span className="text-lg leading-tight font-medium">
           Today&apos;s Follow-ups
           <span className="block text-base font-normal">Example data</span>
         </span>
-        <span className="text-sm">3 scheduled</span>
+        <Crossfade
+          mode={mode}
+          className="text-sm"
+          render={(m) => (m === "register" ? "5 scheduled" : "3 scheduled")}
+        />
       </figcaption>
-      <div className="dark flex flex-col gap-2 text-foreground">
-        {PREVIEW.map((lead, i) => (
-          <div
-            key={lead.name}
-            className={`flex items-center gap-4 rounded-md bg-card px-4 py-3 ${RISE}`}
-            style={{ animationDelay: `${225 + i * 75}ms` }}
-          >
-            <div className="min-w-0 flex-1 text-sm leading-tight">
-              <span className="block truncate font-medium">{lead.name}</span>
-              <span className="block truncate text-muted-foreground">
-                {lead.company}
-              </span>
-            </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium">
-              <span className={`size-2 rounded-full ${lead.dot}`} />
-              {lead.status}
-            </span>
-            <span className="w-16 text-right text-sm text-muted-foreground tabular-nums">
-              {lead.time}
-            </span>
+      {/* Rows are translucent ink so they sit into the orange rather than
+          cut out of it; .dark gives their text the app's light-on-dark tokens. */}
+      <div className="dark flex flex-col text-foreground">
+        <div className="flex flex-col gap-2">
+          {PREVIEW.map((lead, i) => (
+            <PreviewRow
+              key={lead.name}
+              lead={lead}
+              className={RISE}
+              style={{ animationDelay: `${225 + i * 75}ms` }}
+            />
+          ))}
+        </div>
+        <Reveal open={mode === "register"}>
+          <div className="flex flex-col gap-2 pt-2">
+            {PREVIEW_MORE.map((lead) => (
+              <PreviewRow key={lead.name} lead={lead} />
+            ))}
           </div>
-        ))}
+        </Reveal>
       </div>
     </figure>
   )
@@ -321,21 +378,22 @@ export default function AuthPage() {
   return (
     <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-8">
       <div className="grid w-full max-w-5xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:grid-cols-2">
-        {/* Brand panel: the brand orange in both themes, with ink text
-            (5.25:1). It shows the product itself, a "Today's Follow-ups"
-            fragment, instead of decoration. */}
-        <section className="hidden flex-col justify-center gap-10 rounded-lg bg-primary p-10 text-brand-ink lg:flex">
+        {/* Brand panel: a calmer brand orange (brand-surface) in both themes,
+            ink text at 4.6:1. Headline top, product fragment bottom; when
+            the card grows, the space between them and two extra rows absorb
+            it, gliding with the form. */}
+        <section className="hidden flex-col justify-between gap-10 rounded-lg bg-brand-surface p-10 text-brand-ink lg:flex">
           <div className="flex flex-col gap-5">
             <h1 className="animate-in text-6xl leading-[1.02] font-light tracking-tight duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
               Every lead,
-              <span className="block text-primary-foreground">one screen.</span>
+              <span className="block text-brand-ink/70">one screen.</span>
             </h1>
             <p className="max-w-sm animate-in text-base leading-relaxed delay-75 duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
               Lead details, sales status, every discussion and the next
               follow-up, without a page for each lead.
             </p>
           </div>
-          <FollowUpsPreview />
+          <FollowUpsPreview mode={mode} />
         </section>
 
         <section className="flex min-w-0 flex-col gap-8 p-6 sm:p-10">
