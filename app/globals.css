@@ -163,28 +163,31 @@
     }
 }
 
-/* ---- Liquid glass (CSS material only) ----
-   Ported from ~/projects/context_ai/frontend (app/globals.css: the glass
-   tokens and the `glass` utility). Only the CSS pane is here; the WebGL
-   refraction shader (components/liquid-glass.tsx, lib/liquid-glass.ts) stays
-   in that project until we need it. Token names match it so the full version
-   can be dropped in later. Use glass only over media (a photo), never over a
-   flat surface, where it has nothing to refract. */
+/* ---- Frosted glass (CSS material only) ----
+   Glassmorphism in the "frosted" style: a smoky, near-neutral pane with a
+   very heavy blur (what is behind melts into soft glowing shapes), a fine
+   grain, a faint rim and a soft lit top edge. Token names follow
+   ~/projects/context_ai/frontend so its WebGL refraction material
+   (components/liquid-glass.tsx, lib/liquid-glass.ts) can replace this later.
+   Use glass only over media (a photo); over a flat surface it has nothing to
+   frost. */
 :root {
-  /* Tint is what the pane is made of; specular is the lit top edge; edge is
-     the rim light. Override --glass-tint per use for legibility. */
-  --glass-tint: oklch(1 0 0 / 10%);
-  --glass-edge: oklch(1 0 0 / 14%);
-  --glass-specular: oklch(1 0 0 / 30%);
-  --glass-blur: 20px;
+  --glass-tint: oklch(0.2 0 0 / 68%);
+  --glass-edge: oklch(1 0 0 / 12%);
+  --glass-specular: oklch(1 0 0 / 10%);
+  --glass-blur: 48px;
+  /* Fine grain: an inline SVG noise tile, kept faint. */
+  --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --elevation-glass:
-    0 2px 8px oklch(0 0 0 / 24%), 0 12px 32px oklch(0 0 0 / 28%);
+    0 2px 8px oklch(0 0 0 / 18%), 0 18px 40px oklch(0 0 0 / 22%);
 }
 
 @utility glass {
   background-color: var(--glass-tint);
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  background-image: var(--glass-grain);
+  background-size: 160px 160px;
+  backdrop-filter: blur(var(--glass-blur)) saturate(115%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(115%);
   border: 1px solid var(--glass-edge);
   box-shadow:
     var(--elevation-glass),
@@ -196,6 +199,7 @@
   .glass {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    background-color: oklch(0.24 0.006 265 / 96%);
+    background-image: none;
+    background-color: oklch(0.24 0 0 / 96%);
   }
 }

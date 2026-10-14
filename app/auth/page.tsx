@@ -215,12 +215,11 @@ function ProductCards() {
       aria-label="Example LeadFlow cards: this week's calendar with 12 follow-ups, today's agenda (Priya Sharma at 11:30 am, Rahul Verma at 2:00 pm), and three follow-ups today"
     >
       {/* Cards sit over the windows and the table, never across faces. */}
-      {/* This week, in liquid glass: month and total, each day with a dot per
-          follow-up, then today's agenda. The glass tint is darkened from the
-          ported 10% default to 58% so small white text keeps ~4.5:1 over the
-          bright windows behind it. */}
+      {/* This week, in frosted glass: month and total, each day with a dot
+          per follow-up, then today's agenda. The smoky 68% tint keeps small
+          white text readable over the bright windows behind it. */}
       <div
-        className={`absolute top-8 right-20 left-8 flex flex-col gap-3 rounded-lg glass p-4 [--glass-tint:oklch(0.18_0_0/58%)] ${RISE} delay-300`}
+        className={`absolute top-8 right-20 left-8 flex flex-col gap-3 rounded-lg glass p-4 ${RISE} delay-300`}
       >
         <div className="flex items-baseline justify-between px-1">
           <span className="text-sm font-medium">October 2026</span>
