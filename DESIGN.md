@@ -74,7 +74,7 @@ These follow the munim frontend's layout rules (`~/projects/munim_frontend/DESIG
 
 ### Auth page (`/auth`)
 
-- **Layout:** the form is always on the left, with the wordmark at the top, the form centred and a footer row at the bottom (the account switch on the left, the photo credit on the right). On the right is a photo panel with LeadFlow's own cards floating over it (example data). The panel is hidden below `lg`, where the theme toggle moves into the form header.
+- **Layout:** the form column is on the left: wordmark, the Log in / Register pill, a left-aligned two-tone title, the form, then the account-switch line. On the right is a photo panel with LeadFlow's own cards floating over it (example data), and the photo credit as a small pill in its bottom-right corner. The panel is hidden below `lg`, where the theme toggle moves into the form header.
 - **Corner notch:** the theme toggle sits in a cut-out in the photo's top-right corner. The notch is the card colour, and two radial-gradient fillets curve the photo's edge into it (`CornerToggle`).
 - **Photo:** found pictures must be openly licensed with **no identifiable people**, credited on the page, and recorded in `docs/image-credits.json`. The current one is CC BY 2.0, by Shixart1985.
 

@@ -63,7 +63,7 @@ function Field({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-2 pb-3.5">
+    <div className="flex flex-col gap-2 pb-4">
       <Label htmlFor={id}>{label}</Label>
       {children}
     </div>
@@ -180,7 +180,7 @@ const RISE =
   "animate-in duration-500 fill-mode-both fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
 
 // Photo: "Desk workspace featuring coffee cup, laptop, and plant…" by
-// Shixart1985, CC BY 2.0, via Wikimedia Commons. Credited in the form footer;
+// Shixart1985, CC BY 2.0, via Wikimedia Commons. Credited on the photo;
 // source record in docs/image-credits.json.
 const PHOTO_CREDIT_URL =
   "https://commons.wikimedia.org/wiki/File:Desk_workspace_featuring_coffee_cup,_laptop,_and_plant_with_artwork_in_background_during_a_sunny_day.jpg"
@@ -369,142 +369,131 @@ export default function AuthPage() {
 
   return (
     <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-6">
-      <div className="grid w-full max-w-6xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:min-h-[42rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        {/* Form column: wordmark top, form centred, footer row bottom. */}
-        <section className="flex min-w-0 flex-col p-6 sm:p-9">
-          <div className="flex items-center justify-between">
-            <Logo />
-            {/* Below lg the photo (and its corner toggle) is hidden. */}
-            <div className="lg:hidden">
-              <ModeToggle />
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col justify-center py-7">
-            <div className="mx-auto flex w-full max-w-sm flex-col gap-6">
-              <div className="flex flex-col items-center gap-5 text-center">
-                <div
-                  role="group"
-                  aria-label="Choose log in or register"
-                  className="relative grid w-fit grid-cols-2 rounded-full bg-secondary p-1 ring-ring/50 has-focus-visible:ring-3"
-                >
-                  {MODES.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={mode === value}
-                      onClick={() => switchMode(value)}
-                      className="rounded-control px-4 py-1.5 text-sm font-medium outline-none"
-                    >
-                      {value === "login" ? "Log in" : "Register"}
-                    </button>
-                  ))}
-                  {/* The active state is a styled copy of the labels, clipped
-                      to the active half; the clip slides, so fill and text
-                      change in one motion. */}
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-1 grid grid-cols-2 rounded-control bg-primary text-sm font-medium text-primary-foreground transition-[clip-path] duration-250 ease-in-out motion-reduce:transition-none"
-                    style={{
-                      clipPath: isRegister
-                        ? "inset(0 0 0 50% round 9999px)"
-                        : "inset(0 50% 0 0 round 9999px)",
-                    }}
-                  >
-                    <span className="flex items-center justify-center px-4">
-                      Log in
-                    </span>
-                    <span className="flex items-center justify-center px-4">
-                      Register
-                    </span>
-                  </div>
-                </div>
-
-                <h1
-                  className={`text-3xl leading-tight font-light ${RISE} delay-75`}
-                >
-                  <Crossfade
-                    mode={mode}
-                    render={(m) => (
-                      <>
-                        {COPY[m].title}
-                        <span className="mt-1 block text-base text-muted-foreground">
-                          {COPY[m].subtitle}
-                        </span>
-                      </>
-                    )}
-                  />
-                </h1>
+      <div className="grid w-full max-w-6xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <section className="flex min-w-0 flex-col gap-8 p-6 sm:p-10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Logo left. On desktop the theme toggle lives in the photo's
+                corner notch; below lg (no photo) it sits here. */}
+            <div className="flex basis-full items-center justify-between">
+              <Logo />
+              <div className="lg:hidden">
+                <ModeToggle />
               </div>
-
-              <form
-                onSubmit={onSubmit}
-                className={`flex flex-col ${RISE} delay-150`}
-              >
-                <Reveal open={isRegister}>
-                  <Field id="name" label="Full name">
-                    <Input
-                      id="name"
-                      name="name"
-                      autoComplete="name"
-                      required
-                      disabled={!isRegister}
-                      className={FIELD}
-                    />
-                  </Field>
-                </Reveal>
-                <Field id="email" label="Email">
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className={FIELD}
-                  />
-                </Field>
-                <Field id="password" label="Password">
-                  <PasswordInput
-                    id="password"
-                    autoComplete={
-                      isRegister ? "new-password" : "current-password"
-                    }
-                    minLength={isRegister ? 8 : undefined}
-                    invalid={mismatch}
-                  />
-                </Field>
-                <Reveal open={isRegister}>
-                  <Field id="confirm" label="Confirm password">
-                    <PasswordInput
-                      id="confirm"
-                      autoComplete="new-password"
-                      minLength={8}
-                      invalid={mismatch}
-                      inputRef={confirmRef}
-                      disabled={!isRegister}
-                    />
-                  </Field>
-                </Reveal>
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  disabled={pending}
-                  className="mt-2 h-12 w-full text-base"
+            </div>
+            <div
+              role="group"
+              aria-label="Choose log in or register"
+              className="relative grid w-fit grid-cols-2 rounded-full bg-secondary p-1 ring-ring/50 has-focus-visible:ring-3"
+            >
+              {MODES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={mode === value}
+                  onClick={() => switchMode(value)}
+                  className="rounded-control px-4 py-1.5 text-sm font-medium outline-none"
                 >
-                  {pending ? (
-                    "Working…"
-                  ) : (
-                    <Crossfade mode={mode} render={(m) => COPY[m].submit} />
-                  )}
-                </Button>
-              </form>
+                  {value === "login" ? "Log in" : "Register"}
+                </button>
+              ))}
+              {/* The active state is a styled copy of the labels, clipped to
+                  the active half; the clip slides, so fill and text change in
+                  one motion. */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-1 grid grid-cols-2 rounded-control bg-primary text-sm font-medium text-primary-foreground transition-[clip-path] duration-250 ease-in-out motion-reduce:transition-none"
+                style={{
+                  clipPath: isRegister
+                    ? "inset(0 0 0 50% round 9999px)"
+                    : "inset(0 50% 0 0 round 9999px)",
+                }}
+              >
+                <span className="flex items-center justify-center px-4">
+                  Log in
+                </span>
+                <span className="flex items-center justify-center px-4">
+                  Register
+                </span>
+              </div>
             </div>
           </div>
 
-          <div
-            className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-sm text-muted-foreground ${RISE} delay-200`}
+          <h2 className={`text-2xl leading-tight font-light ${RISE} delay-75`}>
+            <Crossfade
+              mode={mode}
+              render={(m) => (
+                <>
+                  {COPY[m].title}
+                  <span className="block text-muted-foreground">
+                    {COPY[m].subtitle}
+                  </span>
+                </>
+              )}
+            />
+          </h2>
+
+          <form
+            onSubmit={onSubmit}
+            className={`flex flex-col ${RISE} delay-150`}
           >
+            <Reveal open={isRegister}>
+              <Field id="name" label="Full name">
+                <Input
+                  id="name"
+                  name="name"
+                  autoComplete="name"
+                  required
+                  disabled={!isRegister}
+                  className={FIELD}
+                />
+              </Field>
+            </Reveal>
+            <Field id="email" label="Email">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className={FIELD}
+              />
+            </Field>
+            <Field id="password" label="Password">
+              <PasswordInput
+                id="password"
+                autoComplete={isRegister ? "new-password" : "current-password"}
+                minLength={isRegister ? 8 : undefined}
+                invalid={mismatch}
+              />
+            </Field>
+            <Reveal open={isRegister}>
+              <Field id="confirm" label="Confirm password">
+                <PasswordInput
+                  id="confirm"
+                  autoComplete="new-password"
+                  minLength={8}
+                  invalid={mismatch}
+                  inputRef={confirmRef}
+                  disabled={!isRegister}
+                />
+              </Field>
+            </Reveal>
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={pending}
+              className="mt-2 h-11 w-full"
+            >
+              {pending ? (
+                "Working…"
+              ) : (
+                <Crossfade mode={mode} render={(m) => COPY[m].submit} />
+              )}
+            </Button>
+          </form>
+
+          <p className={`text-sm text-muted-foreground ${RISE} delay-200`}>
             <Crossfade
               mode={mode}
               render={(m) => (
@@ -515,22 +504,14 @@ export default function AuthPage() {
                     onClick={() =>
                       switchMode(m === "register" ? "login" : "register")
                     }
-                    className="font-medium text-foreground underline underline-offset-4"
+                    className="font-medium text-foreground underline-offset-4 hover:underline"
                   >
                     {COPY[m].switchAction}
                   </button>
                 </span>
               )}
             />
-            <a
-              href={PHOTO_CREDIT_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="hidden underline-offset-4 hover:underline lg:inline"
-            >
-              Photo: Shixart1985, CC BY 2.0
-            </a>
-          </div>
+          </p>
         </section>
 
         {/* Picture panel: a real workspace photo with LeadFlow's own cards
@@ -547,6 +528,14 @@ export default function AuthPage() {
           />
           <ProductCards />
           <CornerToggle />
+          <a
+            href={PHOTO_CREDIT_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute right-4 bottom-4 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white/90 underline-offset-2 hover:underline"
+          >
+            Photo: Shixart1985, CC BY 2.0
+          </a>
         </section>
       </div>
     </main>
