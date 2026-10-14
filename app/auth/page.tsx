@@ -3,7 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { RouteIcon } from "lucide-react"
+import { EyeClosedIcon, EyeIcon, RouteIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -103,18 +103,22 @@ function PasswordInput({
         minLength={minLength}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        className={`${FIELD} pr-20`}
+        className={`${FIELD} pr-12`}
       />
+      {/* Open eye = the password is hidden and can be shown; closed eye =
+          it is visible and can be hidden. The icon swaps instantly: no
+          transition and no press nudge, unlike other buttons. */}
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size="icon-sm"
         aria-pressed={visible}
         aria-label={visible ? "Hide password" : "Show password"}
+        title={visible ? "Hide password" : "Show password"}
         onClick={() => setVisible((v) => !v)}
-        className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
+        className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground transition-none hover:text-foreground active:not-aria-[haspopup]:translate-y-[-50%]"
       >
-        {visible ? "Hide" : "Show"}
+        {visible ? <EyeClosedIcon /> : <EyeIcon />}
       </Button>
     </div>
   )
@@ -216,7 +220,7 @@ function ProductCards() {
     >
       {/* Cards sit over the windows and the table, never across faces. */}
       {/* This week, in frosted glass: month and total, each day with a dot
-          per follow-up, then today's agenda. The smoky 68% tint keeps small
+          per follow-up, then today's agenda. The smoky 40% tint keeps small
           white text readable over the bright windows behind it. */}
       <div
         className={`absolute top-8 right-20 left-8 flex flex-col gap-3 rounded-lg glass p-4 ${RISE} delay-300`}
@@ -319,10 +323,14 @@ function ProductCards() {
  *  same distance from the photo as from the card's outer edge; the 28px
  *  corner is concentric with the 22px button radius. */
 function CornerToggle() {
+  // Each fillet: photo inside the arc, a 2px orange band on the arc (the
+  // photo's edge line continuing round the curve), card outside it.
   const fillet =
-    "pointer-events-none absolute size-6 bg-[radial-gradient(circle_at_0_100%,transparent_1.5rem,var(--card)_calc(1.5rem+0.5px))]"
+    "pointer-events-none absolute size-6 bg-[radial-gradient(circle_at_0_100%,transparent_calc(1.5rem-2px),var(--photo-edge)_calc(1.5rem-2px),var(--photo-edge)_1.5rem,var(--card)_calc(1.5rem+0.5px))]"
   return (
-    <div className="absolute top-0 right-0 z-10 rounded-bl-[1.75rem] bg-card pb-panel pl-panel [&_button]:size-11 [&_svg]:size-5">
+    // The offset outer shadow draws the same 2px line along the notch's
+    // left edge, its curved corner and its bottom edge, on the photo side.
+    <div className="absolute top-0 right-0 z-10 rounded-bl-[1.75rem] bg-card pb-panel pl-panel shadow-[-2px_2px_0_0_var(--photo-edge)] [&_button]:size-11 [&_svg]:size-5">
       <span aria-hidden className={`${fillet} top-0 right-full`} />
       <span aria-hidden className={`${fillet} top-full right-0`} />
       <ModeToggle />
@@ -552,7 +560,7 @@ export default function AuthPage() {
 
         {/* Picture panel: the team photo with LeadFlow's own cards
             floating over it, and the theme toggle in the cut-out corner. */}
-        <section className="relative hidden overflow-hidden rounded-lg bg-muted lg:block">
+        <section className="relative hidden overflow-hidden rounded-lg bg-muted [--photo-edge:color-mix(in_oklch,var(--primary)_55%,var(--card))] lg:block">
           <Image
             src={teamPhoto}
             alt="A small team talking around a meeting table with a laptop, coffee and notes"
@@ -563,6 +571,14 @@ export default function AuthPage() {
             className="object-cover object-[center_20%]"
           />
           <ProductCards />
+          {/* Subtle brand-orange edge (--photo-edge), drawn inside the photo;
+              CornerToggle continues it round the notch. Opaque (orange mixed
+              with the card colour) so overlapping pieces don't darken at the
+              joins. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-[inherit] ring-2 ring-(--photo-edge) ring-inset"
+          />
           <CornerToggle />
         </section>
       </div>
