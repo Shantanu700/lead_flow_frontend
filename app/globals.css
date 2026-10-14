@@ -16,6 +16,7 @@
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
     --color-highlight: var(--highlight);
+    --color-brand-ink: var(--brand-ink);
     --color-primary-hover: var(--primary-hover);
     --color-status-new: var(--status-new);
     --color-status-contacted: var(--status-contacted);
@@ -60,6 +61,10 @@
     --radius-control: var(--radius-pill);
     /* The only gap between panels and cards: gap-panel, p-panel */
     --spacing-panel: 6px;
+    /* Motion curves (Emil Kowalski's set): stronger than Tailwind's defaults.
+       ease-out for things entering/leaving, ease-in-out for on-screen movement. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 :root {
@@ -79,6 +84,8 @@
     --muted-foreground: oklch(0.512 0.014 275.9); /* #64666F, 5:1 on canvas */
     --accent: oklch(0.959 0.003 286.3);
     --accent-foreground: oklch(0.222 0 0);
+    /* Text on large orange (brand) surfaces: 5.25:1. Not redefined in .dark, so it stays ink in both themes. */
+    --brand-ink: oklch(0.222 0 0);
     --highlight: oklch(0.669 0.202 34.8); /* #F75831 VANTA orange — dots, charts, large accents */
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.932 0.012 276.1); /* #E6E8F1 */
