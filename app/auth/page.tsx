@@ -235,7 +235,7 @@ function PreviewRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-4 rounded-md bg-brand-ink/85 px-4 py-3",
+        "flex items-center gap-4 rounded-md bg-card/95 px-4 py-3 transition-colors duration-200",
         className
       )}
       style={style}
@@ -277,9 +277,10 @@ function FollowUpsPreview({ mode }: { mode: Mode }) {
           render={(m) => (m === "register" ? "5 scheduled" : "3 scheduled")}
         />
       </figcaption>
-      {/* Rows are translucent ink so they sit into the orange rather than
-          cut out of it; .dark gives their text the app's light-on-dark tokens. */}
-      <div className="dark flex flex-col text-foreground">
+      {/* Rows follow the page theme like the real app: white cards in light
+          mode, dark cards in dark mode. Slightly translucent so they sit into
+          the orange instead of cutting out of it. */}
+      <div className="flex flex-col text-foreground">
         <div className="flex flex-col gap-2">
           {PREVIEW.map((lead, i) => (
             <PreviewRow
