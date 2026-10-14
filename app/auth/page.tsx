@@ -218,6 +218,13 @@ const PREVIEW_MORE = [
   },
 ] as const
 
+// Log in: form on the left, brand panel on the right. Register: they swap.
+// Both columns are equal width, so each slides exactly one column plus the
+// panel gap, by transform only. The panel (z-10) passes over the form.
+// Reduced motion: the sides swap instantly.
+const SWAP =
+  "transition-transform duration-500 ease-in-out motion-reduce:transition-none"
+
 const RISE =
   "animate-in duration-500 fill-mode-both fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
 
@@ -383,7 +390,13 @@ export default function AuthPage() {
             ink text at 4.6:1. Headline top, product fragment bottom; when
             the card grows, the space between them and two extra rows absorb
             it, gliding with the form. */}
-        <section className="hidden flex-col justify-between gap-10 rounded-lg bg-brand-surface p-10 text-brand-ink lg:flex">
+        <section
+          className={cn(
+            "relative z-10 hidden flex-col justify-between gap-10 rounded-lg bg-brand-surface p-10 text-brand-ink lg:flex",
+            SWAP,
+            !isRegister && "lg:translate-x-[calc(100%+var(--spacing-panel))]"
+          )}
+        >
           <div className="flex flex-col gap-5">
             <h1 className="animate-in text-6xl leading-[1.02] font-light tracking-tight duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
               Every lead,
@@ -397,7 +410,13 @@ export default function AuthPage() {
           <FollowUpsPreview mode={mode} />
         </section>
 
-        <section className="flex min-w-0 flex-col gap-8 p-6 sm:p-10">
+        <section
+          className={cn(
+            "flex min-w-0 flex-col gap-8 p-6 sm:p-10",
+            SWAP,
+            !isRegister && "lg:-translate-x-[calc(100%+var(--spacing-panel))]"
+          )}
+        >
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* Logo left, theme toggle in the top-right corner. */}
             <div className="flex basis-full items-center justify-between">
