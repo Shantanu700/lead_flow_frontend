@@ -279,12 +279,14 @@ function ProductCards() {
 
 /** The theme toggle sits in a notch cut out of the photo's top-right corner.
  *  The notch is the card colour; two radial-gradient fillets curve the photo
- *  edge into it. */
+ *  edge into it. Its padding is the panel gap (6px), so the button sits the
+ *  same distance from the photo as from the card's outer edge; the 28px
+ *  corner is concentric with the 22px button radius. */
 function CornerToggle() {
   const fillet =
     "pointer-events-none absolute size-6 bg-[radial-gradient(circle_at_0_100%,transparent_1.5rem,var(--card)_calc(1.5rem+0.5px))]"
   return (
-    <div className="absolute top-0 right-0 z-10 rounded-bl-[1.75rem] bg-card pb-2.5 pl-2.5 [&_button]:size-11 [&_svg]:size-5">
+    <div className="absolute top-0 right-0 z-10 rounded-bl-[1.75rem] bg-card pb-panel pl-panel [&_button]:size-11 [&_svg]:size-5">
       <span aria-hidden className={`${fillet} top-0 right-full`} />
       <span aria-hidden className={`${fillet} top-full right-0`} />
       <ModeToggle />
