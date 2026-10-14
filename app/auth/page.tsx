@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { RouteIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ModeToggle } from "@/components/mode-toggle"
+import workspace from "@/public/auth/workspace.jpg"
 import {
   getCoreLogin,
   postCoreLogin,
@@ -61,7 +63,7 @@ function Field({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-2 pb-4">
+    <div className="flex flex-col gap-2 pb-3.5">
       <Label htmlFor={id}>{label}</Label>
       {children}
     </div>
@@ -174,139 +176,119 @@ function Reveal({
   )
 }
 
-// Illustrative only: example leads showing what the app looks like inside.
-const PREVIEW = [
-  {
-    name: "Priya Sharma",
-    company: "Example Traders",
-    status: "Proposal Sent",
-    dot: "bg-status-proposal",
-    time: "11:30 am",
-  },
-  {
-    name: "Rahul Verma",
-    company: "Sample Foods",
-    status: "Qualified",
-    dot: "bg-status-qualified",
-    time: "2:00 pm",
-  },
-  {
-    name: "Ananya Iyer",
-    company: "Demo Textiles",
-    status: "Contacted",
-    dot: "bg-status-contacted",
-    time: "4:15 pm",
-  },
-] as const
-
-// Shown when the register form makes the card taller, so the extra height
-// fills with content instead of an empty gap.
-const PREVIEW_MORE = [
-  {
-    name: "Meera Nair",
-    company: "Sample Exports",
-    status: "New",
-    dot: "bg-status-new",
-    time: "5:00 pm",
-  },
-  {
-    name: "Vikram Singh",
-    company: "Demo Motors",
-    status: "Qualified",
-    dot: "bg-status-qualified",
-    time: "6:30 pm",
-  },
-] as const
-
-// Log in: form on the left, brand panel on the right. Register: they swap.
-// Both columns are equal width, so each slides exactly one column plus the
-// panel gap, by transform only. The panel (z-10) passes over the form.
-// Reduced motion: the sides swap instantly.
-const SWAP =
-  "transition-transform duration-500 ease-in-out motion-reduce:transition-none"
-
 const RISE =
   "animate-in duration-500 fill-mode-both fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
 
-type Lead = (typeof PREVIEW)[number] | (typeof PREVIEW_MORE)[number]
+// Photo: "Desk workspace featuring coffee cup, laptop, and plant…" by
+// Shixart1985, CC BY 2.0, via Wikimedia Commons. Credited in the form footer;
+// source record in docs/image-credits.json.
+const PHOTO_CREDIT_URL =
+  "https://commons.wikimedia.org/wiki/File:Desk_workspace_featuring_coffee_cup,_laptop,_and_plant_with_artwork_in_background_during_a_sunny_day.jpg"
 
-function PreviewRow({
-  lead,
-  className,
-  style,
-}: {
-  lead: Lead
-  className?: string
-  style?: React.CSSProperties
-}) {
+// Illustrative only: example data showing what LeadFlow looks like inside.
+const WEEK = [
+  ["Sun", 11],
+  ["Mon", 12],
+  ["Tue", 13],
+  ["Wed", 14],
+  ["Thu", 15],
+  ["Fri", 16],
+  ["Sat", 17],
+] as const
+const TODAY = 15
+const TODAY_LEADS = [
+  { initials: "PS", dot: "bg-status-proposal" },
+  { initials: "RV", dot: "bg-status-qualified" },
+  { initials: "AI", dot: "bg-status-contacted" },
+] as const
+
+/** Floating product cards over the photo, like the reference's calendar
+ *  cards but made from LeadFlow's own content. */
+function ProductCards() {
   return (
     <div
-      className={cn(
-        "flex items-center gap-4 rounded-md bg-card/95 px-4 py-3 transition-colors duration-200",
-        className
-      )}
-      style={style}
+      data-ui
+      role="img"
+      aria-label="Example LeadFlow cards: a follow-up with Priya Sharma at 11:30 am, this week's calendar, and three follow-ups today"
     >
-      <div className="min-w-0 flex-1 text-sm leading-tight">
-        <span className="block truncate font-medium">{lead.name}</span>
-        <span className="block truncate text-muted-foreground">
-          {lead.company}
-        </span>
+      {/* Next follow-up, with the one after it tucked behind. */}
+      <div className={`absolute top-10 left-8 w-64 ${RISE} delay-300`}>
+        <div className="absolute inset-x-6 top-full -mt-5 rounded-b-md bg-brand-ink/90 px-5 pt-7 pb-3 text-xs text-white/75">
+          2:00 pm · Rahul Verma
+        </div>
+        <div className="relative flex items-start justify-between gap-3 rounded-md bg-brand-surface px-5 py-4 text-brand-ink">
+          <div className="leading-tight">
+            <span className="block text-sm font-medium">
+              Follow up with Priya Sharma
+            </span>
+            <span className="mt-1 block text-xs">11:30 am · Proposal Sent</span>
+          </div>
+          <span className="mt-1 size-2 shrink-0 rounded-full bg-brand-ink" />
+        </div>
       </div>
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium">
-        <span className={`size-2 rounded-full ${lead.dot}`} />
-        {lead.status}
-      </span>
-      <span className="w-16 text-right text-sm text-muted-foreground tabular-nums">
-        {lead.time}
-      </span>
+
+      {/* This week. */}
+      <div
+        className={`absolute inset-x-8 bottom-40 grid grid-cols-7 rounded-md bg-black/50 px-3 py-4 text-center text-white backdrop-blur-md ${RISE} delay-400`}
+      >
+        {WEEK.map(([day, date]) => (
+          <div key={date} className="flex flex-col items-center gap-1.5">
+            <span className="text-xs text-white/85">{day}</span>
+            <span
+              className={cn(
+                "flex size-9 items-center justify-center rounded-full text-lg font-light tabular-nums",
+                date === TODAY && "bg-primary text-primary-foreground"
+              )}
+            >
+              {date}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Today's follow-ups: follows the page theme like the real app. */}
+      <div
+        className={`absolute bottom-8 left-8 w-72 rounded-md bg-card px-5 py-4 text-card-foreground ${RISE} delay-500`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-sm leading-tight font-medium">
+            Today&apos;s Follow-ups
+            <span className="block text-xs font-normal text-muted-foreground">
+              3 scheduled · Example data
+            </span>
+          </span>
+          <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />
+        </div>
+        <div className="mt-4 flex">
+          {TODAY_LEADS.map((lead) => (
+            <span
+              key={lead.initials}
+              className="relative -ml-2 flex size-9 items-center justify-center rounded-full bg-secondary text-xs font-medium ring-2 ring-card first:ml-0"
+            >
+              {lead.initials}
+              <span
+                className={`absolute right-0 bottom-0 size-2.5 rounded-full ring-2 ring-card ${lead.dot}`}
+              />
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
 
-function FollowUpsPreview({ mode }: { mode: Mode }) {
+/** The theme toggle sits in a notch cut out of the photo's top-right corner.
+ *  The notch is the card colour; two radial-gradient fillets curve the photo
+ *  edge into it. */
+function CornerToggle() {
+  const fillet =
+    "pointer-events-none absolute size-6 bg-[radial-gradient(circle_at_0_100%,transparent_1.5rem,var(--card)_calc(1.5rem+0.5px))]"
   return (
-    <figure
-      data-ui
-      aria-label="Example of the Today's Follow-ups list, with sample leads"
-      className="flex flex-col gap-3"
-    >
-      <figcaption
-        className={`flex items-baseline justify-between ${RISE} delay-150`}
-      >
-        <span className="text-lg leading-tight font-medium">
-          Today&apos;s Follow-ups
-          <span className="block text-base font-normal">Example data</span>
-        </span>
-        <Crossfade
-          mode={mode}
-          className="text-sm"
-          render={(m) => (m === "register" ? "5 scheduled" : "3 scheduled")}
-        />
-      </figcaption>
-      {/* Rows follow the page theme like the real app: white cards in light
-          mode, dark cards in dark mode. Slightly translucent so they sit into
-          the orange instead of cutting out of it. */}
-      <div className="flex flex-col text-foreground">
-        <div className="flex flex-col gap-2">
-          {PREVIEW.map((lead, i) => (
-            <PreviewRow
-              key={lead.name}
-              lead={lead}
-              className={RISE}
-              style={{ animationDelay: `${225 + i * 75}ms` }}
-            />
-          ))}
-        </div>
-        <Reveal open={mode === "register"}>
-          <div className="flex flex-col gap-2 pt-2">
-            {PREVIEW_MORE.map((lead) => (
-              <PreviewRow key={lead.name} lead={lead} />
-            ))}
-          </div>
-        </Reveal>
-      </div>
-    </figure>
+    <div className="absolute top-0 right-0 z-10 rounded-bl-[1.75rem] bg-card pb-2.5 pl-2.5 [&_button]:size-11 [&_svg]:size-5">
+      <span aria-hidden className={`${fillet} top-0 right-full`} />
+      <span aria-hidden className={`${fillet} top-full right-0`} />
+      <ModeToggle />
+    </div>
   )
 }
 
@@ -384,159 +366,143 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-8">
-      <div className="grid w-full max-w-5xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:grid-cols-2">
-        {/* Brand panel: a calmer brand orange (brand-surface) in both themes,
-            ink text at 4.6:1. Headline top, product fragment bottom; when
-            the card grows, the space between them and two extra rows absorb
-            it, gliding with the form. */}
-        <section
-          className={cn(
-            "relative z-10 hidden flex-col justify-between gap-10 rounded-lg bg-brand-surface p-10 text-brand-ink lg:flex",
-            SWAP,
-            !isRegister && "lg:translate-x-[calc(100%+var(--spacing-panel))]"
-          )}
-        >
-          <div className="flex flex-col gap-5">
-            <h1 className="animate-in text-6xl leading-[1.02] font-light tracking-tight duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
-              Every lead,
-              <span className="block text-brand-ink/70">one screen.</span>
-            </h1>
-            <p className="max-w-sm animate-in text-base leading-relaxed delay-75 duration-500 fade-in-0 fill-mode-both slide-in-from-bottom-4 motion-reduce:animate-none">
-              Lead details, sales status, every discussion and the next
-              follow-up, without a page for each lead.
-            </p>
-          </div>
-          <FollowUpsPreview mode={mode} />
-        </section>
-
-        <section
-          className={cn(
-            "flex min-w-0 flex-col gap-8 p-6 sm:p-10",
-            SWAP,
-            !isRegister && "lg:-translate-x-[calc(100%+var(--spacing-panel))]"
-          )}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Logo left, theme toggle in the top-right corner. */}
-            <div className="flex basis-full items-center justify-between">
-              <Logo />
+    <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-6">
+      <div className="grid w-full max-w-6xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:min-h-[42rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        {/* Form column: wordmark top, form centred, footer row bottom. */}
+        <section className="flex min-w-0 flex-col p-6 sm:p-9">
+          <div className="flex items-center justify-between">
+            <Logo />
+            {/* Below lg the photo (and its corner toggle) is hidden. */}
+            <div className="lg:hidden">
               <ModeToggle />
             </div>
-            <div
-              role="group"
-              aria-label="Choose log in or register"
-              className="relative grid w-fit grid-cols-2 rounded-full bg-secondary p-1 ring-ring/50 has-focus-visible:ring-3"
-            >
-              {MODES.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={mode === value}
-                  onClick={() => switchMode(value)}
-                  className="rounded-control px-4 py-1.5 text-sm font-medium outline-none"
+          </div>
+
+          <div className="flex flex-1 flex-col justify-center py-7">
+            <div className="mx-auto flex w-full max-w-sm flex-col gap-6">
+              <div className="flex flex-col items-center gap-5 text-center">
+                <div
+                  role="group"
+                  aria-label="Choose log in or register"
+                  className="relative grid w-fit grid-cols-2 rounded-full bg-secondary p-1 ring-ring/50 has-focus-visible:ring-3"
                 >
-                  {value === "login" ? "Log in" : "Register"}
-                </button>
-              ))}
-              {/* The active state is a styled copy of the labels, clipped to
-                  the active half; the clip slides, so fill and text change in
-                  one motion. */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-1 grid grid-cols-2 rounded-control bg-primary text-sm font-medium text-primary-foreground transition-[clip-path] duration-250 ease-in-out motion-reduce:transition-none"
-                style={{
-                  clipPath: isRegister
-                    ? "inset(0 0 0 50% round 9999px)"
-                    : "inset(0 50% 0 0 round 9999px)",
-                }}
-              >
-                <span className="flex items-center justify-center px-4">
-                  Log in
-                </span>
-                <span className="flex items-center justify-center px-4">
-                  Register
-                </span>
+                  {MODES.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={mode === value}
+                      onClick={() => switchMode(value)}
+                      className="rounded-control px-4 py-1.5 text-sm font-medium outline-none"
+                    >
+                      {value === "login" ? "Log in" : "Register"}
+                    </button>
+                  ))}
+                  {/* The active state is a styled copy of the labels, clipped
+                      to the active half; the clip slides, so fill and text
+                      change in one motion. */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-1 grid grid-cols-2 rounded-control bg-primary text-sm font-medium text-primary-foreground transition-[clip-path] duration-250 ease-in-out motion-reduce:transition-none"
+                    style={{
+                      clipPath: isRegister
+                        ? "inset(0 0 0 50% round 9999px)"
+                        : "inset(0 50% 0 0 round 9999px)",
+                    }}
+                  >
+                    <span className="flex items-center justify-center px-4">
+                      Log in
+                    </span>
+                    <span className="flex items-center justify-center px-4">
+                      Register
+                    </span>
+                  </div>
+                </div>
+
+                <h1
+                  className={`text-3xl leading-tight font-light ${RISE} delay-75`}
+                >
+                  <Crossfade
+                    mode={mode}
+                    render={(m) => (
+                      <>
+                        {COPY[m].title}
+                        <span className="mt-1 block text-base text-muted-foreground">
+                          {COPY[m].subtitle}
+                        </span>
+                      </>
+                    )}
+                  />
+                </h1>
               </div>
+
+              <form
+                onSubmit={onSubmit}
+                className={`flex flex-col ${RISE} delay-150`}
+              >
+                <Reveal open={isRegister}>
+                  <Field id="name" label="Full name">
+                    <Input
+                      id="name"
+                      name="name"
+                      autoComplete="name"
+                      required
+                      disabled={!isRegister}
+                      className={FIELD}
+                    />
+                  </Field>
+                </Reveal>
+                <Field id="email" label="Email">
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className={FIELD}
+                  />
+                </Field>
+                <Field id="password" label="Password">
+                  <PasswordInput
+                    id="password"
+                    autoComplete={
+                      isRegister ? "new-password" : "current-password"
+                    }
+                    minLength={isRegister ? 8 : undefined}
+                    invalid={mismatch}
+                  />
+                </Field>
+                <Reveal open={isRegister}>
+                  <Field id="confirm" label="Confirm password">
+                    <PasswordInput
+                      id="confirm"
+                      autoComplete="new-password"
+                      minLength={8}
+                      invalid={mismatch}
+                      inputRef={confirmRef}
+                      disabled={!isRegister}
+                    />
+                  </Field>
+                </Reveal>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={pending}
+                  className="mt-2 h-12 w-full text-base"
+                >
+                  {pending ? (
+                    "Working…"
+                  ) : (
+                    <Crossfade mode={mode} render={(m) => COPY[m].submit} />
+                  )}
+                </Button>
+              </form>
             </div>
           </div>
 
-          <h2 className={`text-2xl leading-tight font-light ${RISE} delay-75`}>
-            <Crossfade
-              mode={mode}
-              render={(m) => (
-                <>
-                  {COPY[m].title}
-                  <span className="block text-muted-foreground">
-                    {COPY[m].subtitle}
-                  </span>
-                </>
-              )}
-            />
-          </h2>
-
-          <form
-            onSubmit={onSubmit}
-            className={`flex flex-col ${RISE} delay-150`}
+          <div
+            className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-sm text-muted-foreground ${RISE} delay-200`}
           >
-            <Reveal open={isRegister}>
-              <Field id="name" label="Full name">
-                <Input
-                  id="name"
-                  name="name"
-                  autoComplete="name"
-                  required
-                  disabled={!isRegister}
-                  className={FIELD}
-                />
-              </Field>
-            </Reveal>
-            <Field id="email" label="Email">
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className={FIELD}
-              />
-            </Field>
-            <Field id="password" label="Password">
-              <PasswordInput
-                id="password"
-                autoComplete={isRegister ? "new-password" : "current-password"}
-                minLength={isRegister ? 8 : undefined}
-                invalid={mismatch}
-              />
-            </Field>
-            <Reveal open={isRegister}>
-              <Field id="confirm" label="Confirm password">
-                <PasswordInput
-                  id="confirm"
-                  autoComplete="new-password"
-                  minLength={8}
-                  invalid={mismatch}
-                  inputRef={confirmRef}
-                  disabled={!isRegister}
-                />
-              </Field>
-            </Reveal>
-
-            <Button
-              type="submit"
-              size="lg"
-              disabled={pending}
-              className="mt-2 h-11 w-full"
-            >
-              {pending ? (
-                "Working…"
-              ) : (
-                <Crossfade mode={mode} render={(m) => COPY[m].submit} />
-              )}
-            </Button>
-          </form>
-
-          <p className={`text-sm text-muted-foreground ${RISE} delay-200`}>
             <Crossfade
               mode={mode}
               render={(m) => (
@@ -547,14 +513,38 @@ export default function AuthPage() {
                     onClick={() =>
                       switchMode(m === "register" ? "login" : "register")
                     }
-                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                    className="font-medium text-foreground underline underline-offset-4"
                   >
                     {COPY[m].switchAction}
                   </button>
                 </span>
               )}
             />
-          </p>
+            <a
+              href={PHOTO_CREDIT_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="hidden underline-offset-4 hover:underline lg:inline"
+            >
+              Photo: Shixart1985, CC BY 2.0
+            </a>
+          </div>
+        </section>
+
+        {/* Picture panel: a real workspace photo with LeadFlow's own cards
+            floating over it, and the theme toggle in the cut-out corner. */}
+        <section className="relative hidden overflow-hidden rounded-lg bg-muted lg:block">
+          <Image
+            src={workspace}
+            alt="A bright desk with a closed laptop, a coffee cup, a plant and a framed picture on the wall"
+            fill
+            priority
+            placeholder="blur"
+            sizes="(min-width: 1024px) 55vw, 0px"
+            className="object-cover"
+          />
+          <ProductCards />
+          <CornerToggle />
         </section>
       </div>
     </main>
