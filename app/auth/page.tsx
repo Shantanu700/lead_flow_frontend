@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ModeToggle } from "@/components/mode-toggle"
-import workspace from "@/public/auth/workspace.jpg"
+import teamPhoto from "@/public/auth/team.jpg"
 import {
   getCoreLogin,
   postCoreLogin,
@@ -179,11 +179,8 @@ function Reveal({
 const RISE =
   "animate-in duration-500 fill-mode-both fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
 
-// Photo: "Desk workspace featuring coffee cup, laptop, and plant…" by
-// Shixart1985, CC BY 2.0, via Wikimedia Commons. Credited on the photo;
-// source record in docs/image-credits.json.
-const PHOTO_CREDIT_URL =
-  "https://commons.wikimedia.org/wiki/File:Desk_workspace_featuring_coffee_cup,_laptop,_and_plant_with_artwork_in_background_during_a_sunny_day.jpg"
+// Photo: AI-generated (Google Gemini), supplied for the project; provenance in
+// docs/image-credits.json. No real people are shown.
 
 // Illustrative only: example data showing what LeadFlow looks like inside.
 const WEEK = [
@@ -211,8 +208,9 @@ function ProductCards() {
       role="img"
       aria-label="Example LeadFlow cards: a follow-up with Priya Sharma at 11:30 am, this week's calendar, and three follow-ups today"
     >
+      {/* Cards sit over the windows and the table, never across faces. */}
       {/* Next follow-up, with the one after it tucked behind. */}
-      <div className={`absolute top-10 left-8 w-64 ${RISE} delay-300`}>
+      <div className={`absolute top-36 left-8 w-64 ${RISE} delay-300`}>
         <div className="absolute inset-x-6 top-full -mt-5 rounded-b-md bg-brand-ink/90 px-5 pt-7 pb-3 text-xs text-white/75">
           2:00 pm · Rahul Verma
         </div>
@@ -229,7 +227,7 @@ function ProductCards() {
 
       {/* This week. */}
       <div
-        className={`absolute inset-x-8 bottom-40 grid grid-cols-7 rounded-md bg-black/50 px-3 py-4 text-center text-white backdrop-blur-md ${RISE} delay-400`}
+        className={`absolute top-8 right-20 left-8 grid grid-cols-7 rounded-md bg-black/50 px-3 py-4 text-center text-white backdrop-blur-md ${RISE} delay-400`}
       >
         {WEEK.map(([day, date]) => (
           <div key={date} className="flex flex-col items-center gap-1.5">
@@ -246,20 +244,18 @@ function ProductCards() {
         ))}
       </div>
 
-      {/* Today's follow-ups: follows the page theme like the real app. */}
+      {/* Today's follow-ups: follows the page theme like the real app. One
+          row (text left, avatars right) so it stays low, on the table. */}
       <div
-        className={`absolute bottom-8 left-8 w-72 rounded-md bg-card px-5 py-4 text-card-foreground ${RISE} delay-500`}
+        className={`absolute bottom-6 left-8 flex w-80 items-center justify-between gap-4 rounded-md bg-card px-5 py-3 text-card-foreground ${RISE} delay-500`}
       >
-        <div className="flex items-start justify-between gap-3">
-          <span className="text-sm leading-tight font-medium">
-            Today&apos;s Follow-ups
-            <span className="block text-xs font-normal text-muted-foreground">
-              3 scheduled · Example data
-            </span>
+        <span className="text-sm leading-tight font-medium">
+          Today&apos;s Follow-ups
+          <span className="block text-xs font-normal text-muted-foreground">
+            3 scheduled · Example data
           </span>
-          <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />
-        </div>
-        <div className="mt-4 flex">
+        </span>
+        <div className="flex shrink-0">
           {TODAY_LEADS.map((lead) => (
             <span
               key={lead.initials}
@@ -514,28 +510,20 @@ export default function AuthPage() {
           </p>
         </section>
 
-        {/* Picture panel: a real workspace photo with LeadFlow's own cards
+        {/* Picture panel: the team photo with LeadFlow's own cards
             floating over it, and the theme toggle in the cut-out corner. */}
         <section className="relative hidden overflow-hidden rounded-lg bg-muted lg:block">
           <Image
-            src={workspace}
-            alt="A bright desk with a closed laptop, a coffee cup, a plant and a framed picture on the wall"
+            src={teamPhoto}
+            alt="A small team talking around a meeting table with a laptop, coffee and notes"
             fill
             priority
             placeholder="blur"
             sizes="(min-width: 1024px) 55vw, 0px"
-            className="object-cover"
+            className="object-cover object-[center_20%]"
           />
           <ProductCards />
           <CornerToggle />
-          <a
-            href={PHOTO_CREDIT_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="absolute right-4 bottom-4 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white/90 underline-offset-2 hover:underline"
-          >
-            Photo: Shixart1985, CC BY 2.0
-          </a>
         </section>
       </div>
     </main>
