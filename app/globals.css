@@ -15,6 +15,14 @@
     --color-sidebar-primary: var(--sidebar-primary);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
+    --color-highlight: var(--highlight);
+    --color-primary-hover: var(--primary-hover);
+    --color-status-new: var(--status-new);
+    --color-status-contacted: var(--status-contacted);
+    --color-status-qualified: var(--status-qualified);
+    --color-status-proposal: var(--status-proposal);
+    --color-status-won: var(--status-won);
+    --color-status-lost: var(--status-lost);
     --color-chart-5: var(--chart-5);
     --color-chart-4: var(--chart-4);
     --color-chart-3: var(--chart-3);
@@ -38,82 +46,96 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    /* Radius scale (munim rules): sm badges, md rows/chips, lg nested blocks,
+       xl top-level panels. 2xl–4xl clamp to the 32px ceiling. */
+    --radius-sm: 0.75rem;
+    --radius-md: 1.125rem;
+    --radius-lg: 1.5rem;
+    --radius-xl: 2rem;
+    --radius-2xl: 2rem;
+    --radius-3xl: 2rem;
+    --radius-4xl: 2rem;
+    --radius-pill: 999px;
+    /* Every interactive surface (buttons, menu items, nav rows): rounded-control */
+    --radius-control: var(--radius-pill);
+    /* The only gap between panels and cards: gap-panel, p-panel */
+    --spacing-panel: 6px;
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    /* LeadFlow palette: the VANTA reference (see DESIGN.md) */
+    --background: oklch(0.959 0.003 286.3); /* #F1F1F3 canvas */
+    --foreground: oklch(0.222 0 0); /* #1B1B1B ink */
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    --card-foreground: oklch(0.222 0 0);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.553 0.195 38.402);
-    --primary-foreground: oklch(0.98 0.016 73.684);
-    --secondary: oklch(0.967 0.001 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.553 0.195 38.402);
-    --accent-foreground: oklch(0.98 0.016 73.684);
+    --popover-foreground: oklch(0.222 0 0);
+    --primary: oklch(0.669 0.202 34.8); /* #F75831 — exact reference orange. White text is 3.3:1 (below AA 4.5:1 for small text), chosen deliberately */
+    --primary-hover: oklch(0.615 0.193 35.2); /* #E04A22 */
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.932 0.012 276.1); /* #E6E8F1 */
+    --secondary-foreground: oklch(0.222 0 0);
+    --muted: oklch(0.959 0.003 286.3);
+    --muted-foreground: oklch(0.512 0.014 275.9); /* #64666F, 5:1 on canvas */
+    --accent: oklch(0.959 0.003 286.3);
+    --accent-foreground: oklch(0.222 0 0);
+    --highlight: oklch(0.669 0.202 34.8); /* #F75831 VANTA orange — dots, charts, large accents */
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.837 0.128 66.29);
-    --chart-2: oklch(0.705 0.213 47.604);
-    --chart-3: oklch(0.646 0.222 41.116);
-    --chart-4: oklch(0.553 0.195 38.402);
-    --chart-5: oklch(0.47 0.157 37.304);
-    --radius: 0.875rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.646 0.222 41.116);
-    --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --border: oklch(0.932 0.012 276.1); /* #E6E8F1 */
+    --input: oklch(0.827 0.003 286.3); /* #C6C6C8 */
+    --ring: oklch(0.669 0.202 34.8);
+    --chart-1: oklch(0.669 0.202 34.8);
+    --chart-2: oklch(0.313 0 0);
+    --chart-3: oklch(0.594 0.15 149.7);
+    --chart-4: oklch(0.608 0.157 268.3);
+    --chart-5: oklch(0.605 0.179 304.9);
+    /* Lead statuses: dot colour only; the status text is always shown */
+    --status-new: oklch(0.608 0.157 268.3); /* #5B7BE0 */
+    --status-contacted: oklch(0.605 0.179 304.9); /* #9B5FD6 */
+    --status-qualified: oklch(0.669 0.138 70.9); /* #C98418 */
+    --status-proposal: oklch(0.669 0.202 34.8); /* #F75831 */
+    --status-won: oklch(0.594 0.15 149.7); /* #24964A */
+    --status-lost: oklch(0.631 0.014 276); /* #878992 */
+    --radius: 1.5rem;
+    --shadow-card: 0 1px 2px rgb(27 27 27 / 0.04), 0 8px 24px rgb(27 27 27 / 0.05);
+    --sidebar: oklch(1 0 0);
+    --sidebar-foreground: oklch(0.222 0 0);
+    --sidebar-primary: oklch(0.669 0.202 34.8);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.959 0.003 286.3);
+    --sidebar-accent-foreground: oklch(0.222 0 0);
+    --sidebar-border: oklch(0.932 0.012 276.1);
+    --sidebar-ring: oklch(0.669 0.202 34.8);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.47 0.157 37.304);
-    --primary-foreground: oklch(0.98 0.016 73.684);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
+    --background: oklch(0.178 0 0); /* #121212 */
+    --foreground: oklch(0.959 0.003 286.3);
+    --card: oklch(0.222 0 0); /* #1B1B1B */
+    --card-foreground: oklch(0.959 0.003 286.3);
+    --popover: oklch(0.222 0 0);
+    --popover-foreground: oklch(0.959 0.003 286.3);
+    --secondary: oklch(0.313 0 0); /* #313131 */
+    --secondary-foreground: oklch(0.959 0.003 286.3);
     --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.47 0.157 37.304);
-    --accent-foreground: oklch(0.98 0.016 73.684);
+    --muted-foreground: oklch(0.705 0.022 267.2); /* #9AA0AE */
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.959 0.003 286.3);
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.837 0.128 66.29);
-    --chart-2: oklch(0.705 0.213 47.604);
-    --chart-3: oklch(0.646 0.222 41.116);
-    --chart-4: oklch(0.553 0.195 38.402);
-    --chart-5: oklch(0.47 0.157 37.304);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.705 0.213 47.604);
-    --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+    --chart-2: oklch(0.827 0.003 286.3);
+    --sidebar: oklch(0.222 0 0);
+    --sidebar-foreground: oklch(0.959 0.003 286.3);
     --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-accent-foreground: oklch(0.959 0.003 286.3);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.28);
+}
+
+/* The one elevation: top-level panels only, never nested blocks */
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
 }
 
 @layer base {
