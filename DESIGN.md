@@ -78,6 +78,12 @@ These follow the munim frontend's layout rules (`~/projects/munim_frontend/DESIG
 - **Corner notch:** the theme toggle sits in a cut-out in the photo's top-right corner. The notch is the card colour, and two radial-gradient fillets curve the photo's edge into it (`CornerToggle`).
 - **Photo:** `public/auth/team.jpg`, an AI-generated team-meeting image (Google Gemini) supplied for the project, showing no real people. Record every image's origin in `docs/image-credits.json`. If you swap in a *found* photo instead, it must be openly licensed, show no identifiable real people, and be credited on the page.
 
+### Liquid glass
+
+- The `glass` utility (in `app/globals.css`) is the CSS material only, ported from `~/projects/context_ai/frontend`: a tint, a 20px backdrop blur with 180% saturation, a 14% white rim, a lit top edge and a soft shadow. The WebGL refraction shader stays in that project until it's needed, and the token names match it so it can drop in later.
+- Use glass **only over media** (a photo). Over a flat surface it has nothing to refract and reads as dirty plastic.
+- When glass carries text, darken it per use with `[--glass-tint:…]`. The `/auth` calendar uses 58% so small white text keeps about 4.5:1 over bright windows. `prefers-reduced-transparency` swaps it for an opaque pane.
+
 ### Overlays
 
 - **Dialog / modal (alert-dialog):** a 32px panel centred over a blurred backdrop, with pill actions.

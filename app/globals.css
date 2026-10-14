@@ -162,3 +162,40 @@
     @apply font-sans;
     }
 }
+
+/* ---- Liquid glass (CSS material only) ----
+   Ported from ~/projects/context_ai/frontend (app/globals.css: the glass
+   tokens and the `glass` utility). Only the CSS pane is here; the WebGL
+   refraction shader (components/liquid-glass.tsx, lib/liquid-glass.ts) stays
+   in that project until we need it. Token names match it so the full version
+   can be dropped in later. Use glass only over media (a photo), never over a
+   flat surface, where it has nothing to refract. */
+:root {
+  /* Tint is what the pane is made of; specular is the lit top edge; edge is
+     the rim light. Override --glass-tint per use for legibility. */
+  --glass-tint: oklch(1 0 0 / 10%);
+  --glass-edge: oklch(1 0 0 / 14%);
+  --glass-specular: oklch(1 0 0 / 30%);
+  --glass-blur: 20px;
+  --elevation-glass:
+    0 2px 8px oklch(0 0 0 / 24%), 0 12px 32px oklch(0 0 0 / 28%);
+}
+
+@utility glass {
+  background-color: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    var(--elevation-glass),
+    inset 0 1px 0 0 var(--glass-specular);
+  color: oklch(0.99 0 0);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: oklch(0.24 0.006 265 / 96%);
+  }
+}

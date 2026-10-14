@@ -183,16 +183,22 @@ const RISE =
 // docs/image-credits.json. No real people are shown.
 
 // Illustrative only: example data showing what LeadFlow looks like inside.
+// [day, date, follow-ups that day]
 const WEEK = [
-  ["Sun", 11],
-  ["Mon", 12],
-  ["Tue", 13],
-  ["Wed", 14],
-  ["Thu", 15],
-  ["Fri", 16],
-  ["Sat", 17],
+  ["Sun", 11, 0],
+  ["Mon", 12, 2],
+  ["Tue", 13, 1],
+  ["Wed", 14, 4],
+  ["Thu", 15, 3],
+  ["Fri", 16, 2],
+  ["Sat", 17, 0],
 ] as const
 const TODAY = 15
+const WEEK_TOTAL = WEEK.reduce((sum, [, , n]) => sum + n, 0)
+const AGENDA = [
+  { time: "11:30 am", name: "Priya Sharma", status: "Proposal Sent" },
+  { time: "2:00 pm", name: "Rahul Verma", status: "Qualified" },
+] as const
 const TODAY_LEADS = [
   { initials: "PS", dot: "bg-status-proposal" },
   { initials: "RV", dot: "bg-status-qualified" },
@@ -206,42 +212,77 @@ function ProductCards() {
     <div
       data-ui
       role="img"
-      aria-label="Example LeadFlow cards: a follow-up with Priya Sharma at 11:30 am, this week's calendar, and three follow-ups today"
+      aria-label="Example LeadFlow cards: this week's calendar with 12 follow-ups, today's agenda (Priya Sharma at 11:30 am, Rahul Verma at 2:00 pm), and three follow-ups today"
     >
       {/* Cards sit over the windows and the table, never across faces. */}
-      {/* Next follow-up, with the one after it tucked behind. */}
-      <div className={`absolute top-36 left-8 w-64 ${RISE} delay-300`}>
-        <div className="absolute inset-x-6 top-full -mt-5 rounded-b-md bg-brand-ink/90 px-5 pt-7 pb-3 text-xs text-white/75">
-          2:00 pm · Rahul Verma
-        </div>
-        <div className="relative flex items-start justify-between gap-3 rounded-md bg-brand-surface px-5 py-4 text-brand-ink">
-          <div className="leading-tight">
-            <span className="block text-sm font-medium">
-              Follow up with Priya Sharma
-            </span>
-            <span className="mt-1 block text-xs">11:30 am · Proposal Sent</span>
-          </div>
-          <span className="mt-1 size-2 shrink-0 rounded-full bg-brand-ink" />
-        </div>
-      </div>
-
-      {/* This week. */}
+      {/* This week, in liquid glass: month and total, each day with a dot per
+          follow-up, then today's agenda. The glass tint is darkened from the
+          ported 10% default to 58% so small white text keeps ~4.5:1 over the
+          bright windows behind it. */}
       <div
-        className={`absolute top-8 right-20 left-8 grid grid-cols-7 rounded-md bg-black/50 px-3 py-4 text-center text-white backdrop-blur-md ${RISE} delay-400`}
+        className={`absolute top-8 right-20 left-8 flex flex-col gap-3 rounded-lg glass p-4 [--glass-tint:oklch(0.18_0_0/58%)] ${RISE} delay-300`}
       >
-        {WEEK.map(([day, date]) => (
-          <div key={date} className="flex flex-col items-center gap-1.5">
-            <span className="text-xs text-white/85">{day}</span>
-            <span
+        <div className="flex items-baseline justify-between px-1">
+          <span className="text-sm font-medium">October 2026</span>
+          <span className="text-xs text-white/90">
+            {WEEK_TOTAL} follow-ups this week
+          </span>
+        </div>
+
+        <div className="grid grid-cols-7 text-center">
+          {WEEK.map(([day, date, count]) => {
+            const today = date === TODAY
+            return (
+              <div key={date} className="flex flex-col items-center gap-1">
+                <span className="text-xs text-white/90">{day}</span>
+                <span
+                  className={cn(
+                    "flex size-9 items-center justify-center rounded-full text-lg font-light tabular-nums",
+                    today && "bg-primary text-primary-foreground"
+                  )}
+                >
+                  {date}
+                </span>
+                {/* One dot per follow-up, up to three. */}
+                <span className="flex h-1.5 gap-0.5">
+                  {Array.from({ length: Math.min(count, 3) }, (_, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        today ? "bg-primary" : "bg-white/70"
+                      )}
+                    />
+                  ))}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Today's agenda: the next follow-up in the brand colour, the rest
+            on the glass. */}
+        <div className="flex flex-col gap-1.5">
+          {AGENDA.map((item, i) => (
+            <div
+              key={item.name}
               className={cn(
-                "flex size-9 items-center justify-center rounded-full text-lg font-light tabular-nums",
-                date === TODAY && "bg-primary text-primary-foreground"
+                "flex items-center gap-3 rounded-md px-3 py-2 text-xs",
+                i === 0
+                  ? "bg-brand-surface text-brand-ink"
+                  : "bg-white/10 text-white"
               )}
             >
-              {date}
-            </span>
-          </div>
-        ))}
+              <span className="w-14 shrink-0 tabular-nums">{item.time}</span>
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {i === 0 ? `Follow up with ${item.name}` : item.name}
+              </span>
+              <span className={i === 0 ? "" : "text-white/90"}>
+                {item.status}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Today's follow-ups: follows the page theme like the real app. One
