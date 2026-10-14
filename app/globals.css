@@ -16,6 +16,8 @@
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
     --color-highlight: var(--highlight);
+    --color-brand-ink: var(--brand-ink);
+    --color-brand-surface: var(--brand-surface);
     --color-primary-hover: var(--primary-hover);
     --color-status-new: var(--status-new);
     --color-status-contacted: var(--status-contacted);
@@ -60,6 +62,12 @@
     --radius-control: var(--radius-pill);
     /* The only gap between panels and cards: gap-panel, p-panel */
     --spacing-panel: 6px;
+    /* Motion curves (Emil Kowalski's set): stronger than Tailwind's defaults.
+       ease-out for things entering/leaving, ease-in-out for on-screen movement. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    /* Long, settling glide (iOS drawer curve) for size changes that should feel calm. */
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root {
@@ -79,6 +87,11 @@
     --muted-foreground: oklch(0.512 0.014 275.9); /* #64666F, 5:1 on canvas */
     --accent: oklch(0.959 0.003 286.3);
     --accent-foreground: oklch(0.222 0 0);
+    /* Text on large orange (brand) surfaces: 5.25:1. Not redefined in .dark, so it stays ink in both themes. */
+    --brand-ink: oklch(0.222 0 0);
+    /* Large orange fields (the /auth brand panel): the brand orange deepened 8%
+       towards ink, so a big area doesn't glare. #E5532F; ink on it 4.6:1. */
+    --brand-surface: oklch(0.634 0.188 34.9);
     --highlight: oklch(0.669 0.202 34.8); /* #F75831 VANTA orange — dots, charts, large accents */
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.932 0.012 276.1); /* #E6E8F1 */
@@ -148,4 +161,45 @@
   html {
     @apply font-sans;
     }
+}
+
+/* ---- Frosted glass (CSS material only) ----
+   Glassmorphism in the "frosted" style: a smoky, near-neutral pane with a
+   moderate blur (what is behind stays recognisable but soft), a fine
+   grain, a faint rim and a soft lit top edge. Token names follow
+   ~/projects/context_ai/frontend so its WebGL refraction material
+   (components/liquid-glass.tsx, lib/liquid-glass.ts) can replace this later.
+   Use glass only over media (a photo); over a flat surface it has nothing to
+   frost. */
+:root {
+  --glass-tint: oklch(0.2 0 0 / 40%);
+  --glass-edge: oklch(1 0 0 / 12%);
+  --glass-specular: oklch(1 0 0 / 10%);
+  --glass-blur: 12px;
+  /* Fine grain: an inline SVG noise tile, kept faint. */
+  --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --elevation-glass:
+    0 2px 8px oklch(0 0 0 / 18%), 0 18px 40px oklch(0 0 0 / 22%);
+}
+
+@utility glass {
+  background-color: var(--glass-tint);
+  background-image: var(--glass-grain);
+  background-size: 160px 160px;
+  /* Standard property only: the CSS build adds -webkit- for Safari. Writing
+     both makes it keep just the prefixed one, and Chrome then shows no blur. */
+  backdrop-filter: blur(var(--glass-blur)) saturate(115%);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    var(--elevation-glass),
+    inset 0 1px 0 0 var(--glass-specular);
+  color: oklch(0.99 0 0);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    backdrop-filter: none;
+    background-image: none;
+    background-color: oklch(0.24 0 0 / 96%);
+  }
 }

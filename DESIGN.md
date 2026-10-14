@@ -15,6 +15,8 @@ Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-ca
 | Primary | `primary` | `#F75831` | `#F75831` | Filled buttons, the active pill. The exact reference orange. **White text on it is 3.3:1, below WCAG AA (4.5:1) for small text.** This is a deliberate brand choice; keep labels short and `font-medium`, and never put body copy on it. |
 | Primary hover | `primary-hover` | `#E04A22` | `#E04A22` | Hover and pressed state of primary buttons |
 | Highlight | `highlight` | `#F75831` | `#F75831` | The reference orange: status dots, chart series, focus rings, large accent words |
+| Brand surface | `brand-surface` | `#E5532F` | `#E5532F` | Large orange surfaces, such as the `/auth` follow-up card. It is the brand orange deepened 8% towards ink, so a big area doesn't glare. Use `brand-ink` text on it (4.6:1); muted ink at 70% only for 24px+ text (3.1:1). Small orange elements stay `primary`. |
+| Brand ink | `brand-ink` | `#1B1B1B` | `#1B1B1B` | Text on large orange surfaces (5.25:1). Unlike `foreground`, it stays dark in dark mode. Large text may use white on orange (3.3:1, large only). |
 | Quiet fill | `secondary` | `#E6E8F1` | `#313131` | Inactive pills, icon chips, segmented controls |
 | Lines | `border` / `input` | `#E6E8F1` / `#C6C6C8` | white 10% / 15% | Hairlines; `input` is a 50% fill behind fields |
 
@@ -70,6 +72,22 @@ These follow the munim frontend's layout rules (`~/projects/munim_frontend/DESIG
 - There is one shadow, `shadow-card`, and only top-level panels get it (cards, header, sidebar, drawer). Nested blocks, rows and buttons stay flat.
 - Containers have no outline borders. Surface colour separates them.
 
+### Auth page (`/auth`)
+
+- **Layout:** the form column is on the left: wordmark, the Log in / Register pill, a left-aligned two-tone title, the form, then the account-switch line. On the right is a photo panel with LeadFlow's own cards floating over it (example data), The panel is hidden below `lg`, where the theme toggle moves into the form header.
+- **Corner notch:** the theme toggle sits in a cut-out in the photo's top-right corner. The notch is the card colour, and two radial-gradient fillets curve the photo's edge into it (`CornerToggle`).
+- **Photo:** `public/auth/team.jpg`, an AI-generated team-meeting image (Google Gemini) supplied for the project, showing no real people. Record every image's origin in `docs/image-credits.json`. If you swap in a *found* photo instead, it must be openly licensed, show no identifiable real people, and be credited on the page.
+
+### Frosted glass
+
+- The `glass` utility in `app/globals.css` is a frosted glassmorphism material. It has:
+  - a smoky, near-neutral tint (`oklch(0.2 0 0 / 68%)`)
+  - a very heavy 48px backdrop blur, so whatever is behind melts into soft glowing shapes
+  - a fine grain from an inline SVG noise tile
+  - a faint 12% white rim and a soft lit top edge
+- It's CSS only. Its token names follow `~/projects/context_ai/frontend`, whose WebGL refraction material can replace it later.
+- Use glass **only over media** (a photo); over a flat surface it has nothing to frost. The 68% tint is set so small white text stays readable over bright backgrounds. `prefers-reduced-transparency` swaps it for an opaque pane.
+
 ### Overlays
 
 - **Dialog / modal (alert-dialog):** a 32px panel centred over a blurred backdrop, with pill actions.
@@ -81,4 +99,10 @@ The sidebar keeps the stock shadcn animations (`duration-200 ease-linear`) uncha
 
 ## Motion
 
-Use 150–250 ms ease-out on state changes only: hover, the active pill and the dialog opening. Respect `prefers-reduced-motion`.
+Use 150–250 ms on state changes: hover, the active pill, the dialog opening, and a mode switch. Every animation ships with a `prefers-reduced-motion` variant that keeps opacity changes and drops movement.
+
+- **Curves:** the `ease-out` and `ease-in-out` utilities use stronger curves, set in `app/globals.css`: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` for things entering and leaving, and `--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1)` for things moving on screen. Never use `ease-in`.
+- **Animated properties:** only transform, opacity and clip-path. The one exception is collapsing a section, which uses grid rows.
+- **Segmented toggle:** the active pill is a styled copy of the labels clipped to the active half. The clip slides (250ms ease-in-out), so the fill and the text colour change together. See `/auth`.
+- **Swapping text** (titles, button labels): both versions sit in one grid cell and crossfade with a 4px rise (200ms ease-out). The hidden one is `inert`.
+- **Fields or rows that appear or disappear:** grid rows 0fr→1fr plus opacity over 400ms on `ease-drawer` (`cubic-bezier(0.32, 0.72, 0, 1)`), a long settling glide, so a card changing size feels calm rather than snappy. Collapsed inputs are `disabled`, so they skip validation.
