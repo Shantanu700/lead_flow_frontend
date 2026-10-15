@@ -7,7 +7,7 @@ import { EyeClosedIcon, EyeIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
-import { describeApiError, OFFLINE, refreshCsrf } from "@/lib/api"
+import { ApiFailure, OFFLINE, refreshCsrf, toastFailure } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -411,7 +411,7 @@ export default function AuthPage() {
 
     if (isRegister && password !== String(form.get("confirm") ?? "")) {
       setMismatch(true)
-      toast.error(
+      toast.warning(
         "Those two passwords do not match. Retype them and try again."
       )
       confirmRef.current?.focus()
@@ -422,7 +422,7 @@ export default function AuthPage() {
     const id = toast.loading(copy.pending)
 
     try {
-      const { error } = isRegister
+      const { error, response } = isRegister
         ? await postCoreRegister({
             body: {
               name: String(form.get("name") ?? "").trim(),
@@ -433,7 +433,7 @@ export default function AuthPage() {
         : await postCoreLogin({ body: { email, password } })
 
       if (error) {
-        toast.error(describeApiError(error), { id })
+        toastFailure(new ApiFailure(error, response?.status), { id })
         return
       }
       refreshCsrf()

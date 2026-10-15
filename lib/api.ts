@@ -1,6 +1,8 @@
 // Configures the generated API client (src/client). Import this module before
 // calling any SDK function; it is imported for its side effects.
 import { client } from "@/src/client/client.gen"
+import { toast, type ExternalToast } from "sonner"
+
 import { getCoreCsrf } from "@/src/client/sdk.gen"
 
 export const API_BASE =
@@ -56,3 +58,33 @@ export function describeApiError(error: unknown): string {
 
 export const OFFLINE =
   "Could not reach the server. Check your connection and try again."
+
+/** A failed API call: the error body and the HTTP status it came with. */
+export class ApiFailure extends Error {
+  constructor(
+    public body: unknown,
+    public status?: number
+  ) {
+    super(describeApiError(body))
+  }
+}
+
+// Statuses that mean "the server refused this input": an invalid action.
+const REJECTED = new Set([400, 409, 418, 422])
+
+/** Show a failure as the right kind of toast: input the server rejected is
+ *  a warning (amber); offline, auth and server failures are errors (red). */
+export function toastFailure(error: unknown, options?: ExternalToast) {
+  // No response at all: the server couldn't be reached.
+  if (
+    error instanceof TypeError ||
+    (error instanceof ApiFailure && error.status === undefined)
+  )
+    return toast.error(OFFLINE, options)
+  if (error instanceof ApiFailure && REJECTED.has(error.status ?? 0))
+    return toast.warning(error.message, options)
+  return toast.error(
+    error instanceof ApiFailure ? error.message : describeApiError(error),
+    options
+  )
+}

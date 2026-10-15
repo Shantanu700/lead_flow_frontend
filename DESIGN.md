@@ -122,6 +122,18 @@ Use 150–250 ms on state changes: hover, the active pill, the dialog opening, a
 - **Animated properties:** only transform, opacity and clip-path. The one exception is collapsing a section, which uses grid rows.
 - **Segmented toggle:** the active pill is a styled copy of the labels clipped to the active half. The clip slides (250ms ease-in-out), so the fill and the text colour change together. See `/auth`.
 - **Dropdowns** use the shadcn Select (`components/ui/select.tsx`), never a native `<select>`. The list opens below its trigger and scales in from it (0.95 → 1, fading, 150ms ease-out) and leaves the same way. The chevron flips while it's open. Items are `rounded-control` pills. Reduced motion turns the animation off.
+- **Date and time** use `components/date-time-picker.tsx`, never native date or time inputs.
+  - It has two steps: the shadcn calendar, with past days disabled, then a clock dial.
+  - The steps slide in from their side (200ms ease-out).
+  - The dial hand turns to each pick (200ms ease-out), but follows a drag directly. The numbers crossfade when switching between hours and minutes.
+  - The hour and minute boxes take typing, and the dial is a keyboard slider.
+  - Selected parts use `bg-primary/12 text-primary`.
+- **Toasts** come in four kinds and are coloured by kind (Sonner `richColors`):
+  - `success`: a confirmed save.
+  - `warning`: an invalid or wrong action, whether caught before sending or rejected by the server (400, 409, 418, 422).
+  - `error`: a real failure (offline, signed out, server error).
+  - `info`: neutral notices.
+  - Show API failures through `toastFailure()` in `lib/api.ts`, which picks the kind from the HTTP status.
 - **Swapping text** (titles, button labels): both versions sit in one grid cell and crossfade with a 4px rise (200ms ease-out). The hidden one is `inert`.
 - **Theme change:** the new theme wipes in from the left edge over 700ms. The curve is logarithmic, y = ln(1 + 15t) / ln(16), sampled into CSS `linear()`: it leaves the edge fast and settles slowly. It is a native Web Animation on the view-transition snapshot, **not GSAP**: a GSAP tween runs on the main thread and stutters while the app re-renders for the new theme. Persisting the choice (next-themes `setTheme`) waits until the wipe ends. Both the toggle button and the `d` key go through `useThemeToggle()` (`components/theme-provider.tsx`); `app/globals.css` only turns off the default crossfade. With reduced motion, or in a browser without view transitions, the theme switches instantly.
 - **Fields or rows that appear or disappear:** grid rows 0fr→1fr plus opacity over 400ms on `ease-drawer` (`cubic-bezier(0.32, 0.72, 0, 1)`), a long settling glide, so a card changing size feels calm rather than snappy. Collapsed inputs are `disabled`, so they skip validation.

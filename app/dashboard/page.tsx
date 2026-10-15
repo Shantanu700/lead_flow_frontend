@@ -27,7 +27,8 @@ import gsap from "gsap"
 import { Flip } from "gsap/Flip"
 import { toast } from "sonner"
 
-import { describeApiError, OFFLINE, refreshCsrf } from "@/lib/api"
+import { ApiFailure, refreshCsrf, toastFailure } from "@/lib/api"
+import { DateTimePicker } from "@/components/date-time-picker"
 import { NOTCH_R, Notch } from "@/components/notch"
 import { useSession } from "@/components/session"
 import { useThemeToggle } from "@/components/theme-provider"
@@ -149,8 +150,7 @@ export default function Page() {
   const [form, setForm] = React.useState(BLANK_FORM)
   const [note, setNote] = React.useState("")
   const [fuOn, setFuOn] = React.useState(false)
-  const [fuDate, setFuDate] = React.useState("")
-  const [fuTime, setFuTime] = React.useState("")
+  const [fuAt, setFuAt] = React.useState<Date | null>(null)
   const [sort, setSort] = React.useState<Sort>("Recent")
   // Server data. Each tab loads only what it shows (see `load`).
   const [ready, setReady] = React.useState(false)
@@ -550,7 +550,8 @@ export default function Page() {
     if (seq !== listSeq.current) return // a newer request superseded this one
     // The page ran off the end (e.g. after a status change): back to page 1.
     if (response?.status === 404 && pageIdx > 0) return setPage(0)
-    if (error !== undefined || !data) throw error ?? new Error()
+    if (error !== undefined || !data)
+      throw new ApiFailure(error, response?.status)
     setList(data)
   }
   /** Fetch what tab `v` shows (and nothing else). Resolves when it's in;
@@ -581,12 +582,9 @@ export default function Page() {
     return Promise.all(jobs).then(
       () => {},
       (error) => {
-        toast.error(
-          error instanceof TypeError ? OFFLINE : describeApiError(error),
-          {
-            id: "load-failed",
-          }
-        )
+        toastFailure(error, {
+          id: "load-failed",
+        })
       }
     )
   }
@@ -912,7 +910,7 @@ export default function Page() {
     const t = setTimeout(
       () =>
         fetchList(view).catch((e) => {
-          toast.error(describeApiError(e))
+          toastFailure(e)
           if (rollOnList.current) {
             rollOnList.current = false
             rollTexts() // shows the frozen text again
@@ -985,7 +983,7 @@ export default function Page() {
     setSheet(true)
     got(getApiLeadsDiscussions({ path: { id } }), (list) =>
       setTalk((all) => ({ ...all, [id]: list }))
-    ).catch((error) => toast.error(describeApiError(error)))
+    ).catch(toastFailure)
   }
   const toggleFu = async (lead: Lead) => {
     const done = !lead.follow_up_done_at
@@ -997,7 +995,7 @@ export default function Page() {
       if (done) toast.success("Follow-up done.")
       refresh()
     } catch (error) {
-      toast.error(describeApiError(error))
+      toastFailure(error)
     }
   }
   // Saves show only what the server confirmed; on failure the form keeps
@@ -1037,7 +1035,7 @@ export default function Page() {
       setAdd(false)
       refresh()
     } catch (error) {
-      toast.error(describeApiError(error))
+      toastFailure(error)
     } finally {
       setSaving(false)
     }
@@ -1046,8 +1044,8 @@ export default function Page() {
     e.preventDefault()
     if (!selLead || !note.trim() || saving) return
     // Keep everything typed when the follow-up is incomplete.
-    if (fuOn && (!fuDate || !fuTime)) {
-      toast.error("Pick both a date and a time for the follow-up.")
+    if (fuOn && !fuAt) {
+      toast.warning("Pick a date and time for the follow-up.")
       return
     }
     const id = selLead.id
@@ -1058,9 +1056,7 @@ export default function Page() {
           path: { id },
           body: {
             note: note.trim(),
-            follow_up_at: fuOn
-              ? new Date(`${fuDate}T${fuTime}`).toISOString()
-              : null,
+            follow_up_at: fuOn ? fuAt!.toISOString() : null,
           },
         }),
         ({ discussion, lead }) => {
@@ -1070,12 +1066,11 @@ export default function Page() {
       )
       setNote("")
       setFuOn(false)
-      setFuDate("")
-      setFuTime("")
+      setFuAt(null)
       toast.success(fuOn ? "Note and follow-up saved." : "Note added.")
       refresh()
     } catch (error) {
-      toast.error(describeApiError(error))
+      toastFailure(error)
     } finally {
       setSaving(false)
     }
@@ -1094,7 +1089,7 @@ export default function Page() {
       toast.success(`Moved to ${status}.`)
       refresh()
     } catch (error) {
-      toast.error(describeApiError(error))
+      toastFailure(error)
     } finally {
       setSaving(false)
     }
@@ -2553,24 +2548,13 @@ export default function Page() {
                 />
                 Set follow-up
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="date"
-                  aria-label="Follow-up date"
-                  disabled={!fuOn}
-                  required={fuOn}
-                  value={fuDate}
-                  onChange={(e) => setFuDate(e.target.value)}
-                />
-                <Input
-                  type="time"
-                  aria-label="Follow-up time"
-                  disabled={!fuOn}
-                  required={fuOn}
-                  value={fuTime}
-                  onChange={(e) => setFuTime(e.target.value)}
-                />
-              </div>
+              <DateTimePicker
+                id="follow-up-at"
+                value={fuAt}
+                onChange={setFuAt}
+                disabled={!fuOn}
+                placeholder="Pick the follow-up date and time"
+              />
               <Button type="submit" disabled={!note.trim() || saving}>
                 Save note
               </Button>
@@ -3067,11 +3051,12 @@ const csvCell = (v: string | number | null) => {
 }
 /** Unwrap an SDK result: hand the data to `apply`, or throw the API error. */
 async function got<T>(
-  call: Promise<{ data?: T; error?: unknown }>,
+  call: Promise<{ data?: T; error?: unknown; response?: Response }>,
   apply: (data: T) => void
 ) {
-  const { data, error } = await call
-  if (error !== undefined || data === undefined) throw error ?? new Error()
+  const { data, error, response } = await call
+  if (error !== undefined || data === undefined)
+    throw new ApiFailure(error, response?.status)
   apply(data)
 }
 // Short bar labels: ₹42.6k, ₹1.2L.

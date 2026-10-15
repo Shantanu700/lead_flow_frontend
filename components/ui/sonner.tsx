@@ -16,6 +16,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      // Each kind gets its own colour (success, warning, error, info).
+      richColors
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
