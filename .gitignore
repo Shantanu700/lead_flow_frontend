@@ -43,3 +43,17 @@ certificates/
 
 # design-taste-frontend inspector output
 .taste-skill/
+
+# design-sync (converter staging, build output, machine state)
+/.ds-sync/
+/ds-bundle/
+/.design-sync/.cache/
+/.design-sync/learnings/
+/.design-sync/node_modules
+/dist/
+
+# local agent and design tooling
+/.agents/
+/.claude/
+/.design-sync/
+/skills-lock.json

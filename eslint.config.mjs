@@ -16,6 +16,12 @@ const eslintConfig = defineConfig([
     "src/client/**",
     // Local agent tooling, not app code.
     ".agents/**",
+    ".claude/**",
+    ".design-sync/**",
+    ".ds-sync/**",
+    // Design-sync build output (gitignored).
+    "ds-bundle/**",
+    "dist/**",
   ]),
 ]);
 
