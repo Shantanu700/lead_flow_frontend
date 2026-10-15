@@ -174,4 +174,4 @@ docs/                   SPEC.md (the brief) and screenshots
 
 ## Use of AI
 
-This project was built with **[Claude Code](https://claude.com/claude-code)** (Anthropic) as an AI pair programmer, as the brief encouraged. Claude Code wrote most of the code, tests, docs and commit messages from my instructions and design decisions, and ran the checks described above. Commits it authored carry a `Co-Authored-By: Claude` trailer, and its pull requests say "Generated with Claude Code".
+I built LeadFlow with the help of **[Claude Code](https://claude.com/claude-code)** (Anthropic), as the brief recommends. I designed the product and its interface, chose the stack and the API design, and directed the work feature by feature. Claude Code assisted with writing and refining the code, tests and docs. I reviewed and approved every change before it was committed. Commits it helped with carry a `Co-Authored-By: Claude` trailer.
