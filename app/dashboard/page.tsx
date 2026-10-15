@@ -96,7 +96,15 @@ import { cn } from "@/lib/utils"
 type Status = (typeof STAGES)[number][0]
 type Period = (typeof PERIODS)[number]
 /** A timeline entry. System events (lead created) aren't discussions. */
-type Note = { date: string; note: string; follow?: string; system?: boolean }
+type Note = {
+  key: string
+  /** When it was logged (ISO), for the relative time. */
+  at: string
+  note: string
+  /** The follow-up this note scheduled (ISO). */
+  follow?: string | null
+  system?: boolean
+}
 type Sort = "Recent" | "Value" | "Name"
 
 gsap.registerPlugin(useGSAP, Flip)
@@ -200,6 +208,10 @@ export default function Page() {
   // Overdue card: direction of the step in progress (-1 back, 1 forward).
   const odDir = React.useRef(0)
   const odRef = React.useRef<HTMLDivElement>(null)
+  const tlRef = React.useRef<HTMLOListElement>(null)
+  const tlSeen = React.useRef<{ lead?: number; keys: Set<string> }>({
+    keys: new Set(),
+  })
   // Lead rows before a list change (see captureRows).
   const rowsState = React.useRef<Flip.FlipState | null>(null)
   const prevIds = React.useRef<Set<string>>(new Set())
@@ -791,6 +803,78 @@ export default function Page() {
     { scope: contentRef, dependencies: [pending.length] }
   )
 
+  // Drawer timeline: entries not shown before rise in, staggered when the
+  // drawer opens and one at a time as notes are added; their dots pop and
+  // follow-up pills slide out of the notch.
+  useGSAP(
+    () => {
+      const el = tlRef.current
+      if (!sheet || !selLead || !el) {
+        tlSeen.current = { keys: new Set() }
+        return
+      }
+      if (tlSeen.current.lead !== selLead.id)
+        tlSeen.current = { lead: selLead.id, keys: new Set() }
+      const seen = tlSeen.current.keys
+      const fresh = [
+        ...el.querySelectorAll<HTMLElement>("[data-tl-item]"),
+      ].filter((n) => !seen.has(n.dataset.tlItem!))
+      if (!fresh.length) return
+      // Nothing shown yet: the drawer has just opened (wait for its slide).
+      const opening = seen.size === 0
+      fresh.forEach((n) => seen.add(n.dataset.tlItem!))
+      if (reduceMotion()) return
+      const delay = opening ? 0.12 : 0
+      const stagger = 0.05
+      gsap.fromTo(
+        fresh,
+        { opacity: 0, y: opening ? 10 : -8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.4,
+          ease: "power3.out",
+          delay,
+          stagger,
+          clearProps: "opacity,transform",
+        }
+      )
+      gsap.fromTo(
+        fresh.map((n) => n.querySelector("[data-tl-dot]")),
+        { scale: 0.3 },
+        {
+          scale: 1,
+          duration: 0.45,
+          ease: "back.out(2.5)",
+          delay,
+          stagger,
+          clearProps: "transform",
+        }
+      )
+      const pills = fresh.flatMap((n) => [
+        ...n.querySelectorAll("[data-tl-follow]"),
+      ])
+      if (pills.length)
+        gsap.fromTo(
+          pills,
+          { opacity: 0, x: 10 },
+          {
+            opacity: 1,
+            x: 0,
+            duration: 0.35,
+            ease: "power3.out",
+            delay: delay + 0.15,
+            stagger,
+            clearProps: "opacity,transform",
+          }
+        )
+    },
+    {
+      scope: tlRef,
+      dependencies: [sheet, selLead?.id, selLead && talk[selLead.id]?.length],
+    }
+  )
+
   // ⌘K / Ctrl+K opens the palette from anywhere on the dashboard.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -908,11 +992,17 @@ export default function Page() {
   const timeline: Note[] = selLead
     ? [
         ...(talk[selLead.id] ?? []).map((d) => ({
-          date: stamp(d.created_at),
+          key: "d" + d.id,
+          at: d.created_at,
           note: d.note,
-          follow: d.follow_up_at ? stamp(d.follow_up_at) : undefined,
+          follow: d.follow_up_at,
         })),
-        { date: stamp(selLead.created_at), note: "Lead created", system: true },
+        {
+          key: "created",
+          at: selLead.created_at,
+          note: "Lead created",
+          system: true,
+        },
       ]
     : []
   const fuLeft = today.filter((l) => !l.follow_up_done_at).length
@@ -2645,35 +2735,89 @@ export default function Page() {
               )
             })}
           </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-4">
-            {timeline.map((t, i) =>
-              t.system ? (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground"
+          {/* Timeline: newest first down a rail. The newest dot is orange;
+              a note that scheduled a follow-up carries it in a notch, solid
+              orange while it is still the lead's open follow-up. */}
+          <ol
+            ref={tlRef}
+            aria-label="Discussion history"
+            className="m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto px-4 pt-2"
+          >
+            {timeline.map((t, i) => {
+              const last = i === timeline.length - 1
+              const rel = ago(t.at)
+              const open =
+                !!t.follow &&
+                t.follow === selLead?.next_follow_up_at &&
+                !selLead?.follow_up_done_at
+              return (
+                <li
+                  key={t.key}
+                  data-tl-item={t.key}
+                  className="relative grid grid-cols-[14px_minmax(0,1fr)] gap-x-3 pb-5"
                 >
-                  <span className="size-1.5 rounded-full bg-muted-foreground" />
-                  {t.note} · {t.date}
-                </div>
-              ) : (
-                <div
-                  key={i}
-                  className="flex flex-col gap-1 rounded-[18px] bg-muted px-4 py-3 text-sm"
-                >
-                  <span className="text-xs text-muted-foreground">
-                    {t.date}
-                  </span>
-                  {t.note}
-                  {t.follow && (
-                    <span className="mt-1 flex items-center gap-1.5 text-xs font-medium">
-                      <Calendar size={12} strokeWidth={1.75} />
-                      Follow-up {t.follow}
-                    </span>
+                  {!last && (
+                    <span
+                      aria-hidden
+                      className="absolute top-5 bottom-0 left-[6.5px] w-px bg-border"
+                    />
                   )}
-                </div>
+                  <span
+                    aria-hidden
+                    data-tl-dot
+                    className={cn(
+                      "mt-1 size-3.5 rounded-full transition-[background-color,box-shadow] duration-300",
+                      i === 0
+                        ? "bg-primary shadow-[0_0_0_4px_color-mix(in_oklch,var(--primary)_18%,transparent)]"
+                        : t.system
+                          ? "border-2 border-muted-foreground/40 bg-popover"
+                          : "bg-muted-foreground/30"
+                    )}
+                  />
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <span className="text-xs font-medium">
+                      <time dateTime={t.at}>{stamp(t.at)}</time>
+                      {/* After a week ago() gives a date, which the stamp
+                          already shows. */}
+                      {/ago$|now$|^Yesterday$/.test(rel) && (
+                        <span className="font-normal text-muted-foreground">
+                          {" · " + rel}
+                        </span>
+                      )}
+                    </span>
+                    <div
+                      className={cn(
+                        "relative rounded-[18px] bg-muted px-4 py-3 text-sm leading-relaxed",
+                        t.system && "text-muted-foreground italic",
+                        // Room under the text for the follow-up notch.
+                        t.follow && "pb-[46px]"
+                      )}
+                    >
+                      {t.note}
+                      {t.follow && (
+                        <Notch corner="br" r={22} gap={6}>
+                          {/* r = the pill's 16px ends + the 6px gap, so
+                              the curves run parallel. */}
+                          <span
+                            data-tl-follow
+                            className={cn(
+                              "flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium whitespace-nowrap",
+                              open
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-primary/12 text-primary"
+                            )}
+                          >
+                            <Calendar size={13} strokeWidth={1.75} />
+                            Follow-up {stamp(t.follow)}
+                          </span>
+                        </Notch>
+                      )}
+                    </div>
+                  </div>
+                </li>
               )
-            )}
-          </div>
+            })}
+          </ol>
           <SheetFooter>
             <form onSubmit={addNote} className="flex flex-col gap-2.5">
               <Label htmlFor="note" className="sr-only">
