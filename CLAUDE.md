@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Frontend for **LeadFlow**, a single-screen CRM (lead list, status filters, "Today's Follow-ups", Add Lead modal, lead timeline dialog). `README.md` is the product spec: requirements, business rules, suggested data model and REST contract (`/api/leads/`, `/api/leads/{id}/discussions/`, `/api/follow-ups/today/`). Read it before building features; its "Getting Started" section has the setup for both servers. The backend (Django REST, in `../backend`) is a separate repo.
+Frontend for **LeadFlow**, a single-screen CRM (lead list, status filters, "Today's Follow-ups", Add Lead modal, lead timeline dialog). `README.md` is the product spec: requirements, business rules, suggested data model and REST contract (`/api/leads/`, `/api/leads/{id}/discussions/`, `/api/follow-ups/today/`). Read it before building features; its "Getting Started" section has the setup for both servers. The backend (Django REST) is a separate repo, [lead_flow_backend](https://github.com/Shantanu700/lead_flow_backend), usually cloned next to this one as `../backend`.
 
 Spec rules that are easy to get wrong:
 - Everything happens on one screen. Opening a lead shows a dialog; it never navigates to a details page.
@@ -26,7 +26,7 @@ The package manager is Bun (`bun.lock`).
 - `bun run typecheck`: `tsc --noEmit`
 - `bun run format`: Prettier with the Tailwind class-sorting plugin
 
-No test runner is set up yet. Check UI changes in a real browser at desktop (1440px), tablet (~900px) and phone (390px) widths. Backend tests run in the `leadflow_dev_web` container with `python -m pytest`; `python manage.py seed_leads --reset` restores the sample leads.
+No test runner is set up yet. Check UI changes in a real browser at desktop (1440px), tablet (~900px) and phone (390px) widths. Backend tests run in the `leadflow_dev_web` container with `python -m pytest`; `python manage.py seed_fixtures --reset` restores the sample data.
 
 ## The dashboard
 
