@@ -107,7 +107,7 @@ if (process.env.NODE_ENV !== "production" && typeof window !== "undefined")
 
 const ic = { size: 20, strokeWidth: 1.75 }
 const sm = { size: 16, strokeWidth: 1.75 }
-const LEAD_COLS = "minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) 110px 36px"
+const LEAD_COLS = "minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) 110px"
 
 export default function Page() {
   const user = useSession()
@@ -1834,11 +1834,7 @@ export default function Page() {
                     View all leads <ArrowRight {...sm} />
                   </button>
                 </Notch>
-                <LeadTable
-                  rows={list.results}
-                  onOpen={openLead}
-                  onEdit={openEdit}
-                />
+                <LeadTable rows={list.results} onOpen={openLead} />
               </section>
             </>
           )}
@@ -2853,19 +2849,22 @@ function LeadTable({
 }: {
   rows: Lead[]
   onOpen: (id: number) => void
-  onEdit: (lead: Lead) => void
+  /** Leads tab only: adds a pencil to each row. */
+  onEdit?: (lead: Lead) => void
 }) {
+  // The pencil gets its own column only where editing is offered.
+  const cols = onEdit ? LEAD_COLS + " 36px" : LEAD_COLS
   return (
     <>
       <div
         className="grid gap-3 px-4 text-xs font-medium text-muted-foreground"
-        style={{ gridTemplateColumns: LEAD_COLS }}
+        style={{ gridTemplateColumns: cols }}
       >
         <span>Name</span>
         <span>Status</span>
         <span>Last note</span>
         <span className="text-right">Value</span>
-        <span />
+        {onEdit && <span />}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
         {rows.map((l) => (
@@ -2874,8 +2873,11 @@ function LeadTable({
           <div
             key={l.id}
             data-flip-id={"lead-" + l.id}
-            className="group relative grid items-center gap-3 rounded-[18px] bg-card py-3 pr-2.5 pl-4 text-left text-foreground transition-colors duration-150 hover:bg-secondary"
-            style={{ gridTemplateColumns: LEAD_COLS }}
+            className={cn(
+              "group relative grid items-center gap-3 rounded-[18px] bg-card py-3 pl-4 text-left text-foreground transition-colors duration-150 hover:bg-secondary",
+              onEdit ? "pr-2.5" : "pr-4"
+            )}
+            style={{ gridTemplateColumns: cols }}
           >
             <button
               type="button"
@@ -2912,18 +2914,20 @@ function LeadTable({
             <span className="text-right text-[15px] font-light tabular-nums">
               {money(l.value ?? 0)}
             </span>
-            <button
-              type="button"
-              title="Edit lead"
-              aria-label={`Edit ${l.name}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit(l)
-              }}
-              className="relative grid size-9 flex-none cursor-pointer place-items-center rounded-full border-0 bg-secondary text-muted-foreground transition-[background-color,color,transform] duration-150 ease-out group-hover:bg-card hover:bg-foreground! hover:text-card active:scale-[0.94] motion-reduce:active:scale-100"
-            >
-              <Pencil size={14} strokeWidth={1.75} />
-            </button>
+            {onEdit && (
+              <button
+                type="button"
+                title="Edit lead"
+                aria-label={`Edit ${l.name}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(l)
+                }}
+                className="relative grid size-9 flex-none cursor-pointer place-items-center rounded-full border-0 bg-secondary text-muted-foreground transition-[background-color,color,transform] duration-150 ease-out group-hover:bg-card hover:bg-foreground! hover:text-card active:scale-[0.94] motion-reduce:active:scale-100"
+              >
+                <Pencil size={14} strokeWidth={1.75} />
+              </button>
+            )}
           </div>
         ))}
         {rows.length === 0 && (
