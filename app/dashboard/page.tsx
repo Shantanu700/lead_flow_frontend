@@ -41,6 +41,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -159,6 +168,10 @@ export default function Page() {
   // Each lead's discussions, newest first, fetched when its sheet opens.
   const [talk, setTalk] = React.useState<Record<number, Discussion[]>>({})
   const [saving, setSaving] = React.useState(false)
+  // Export: the button shows a check for a moment after a download.
+  const [exported, setExported] = React.useState(false)
+  const exportTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
+  const bellCount = React.useRef<number | null>(null)
   // The lead dialog edits this lead; null means it adds a new one.
   const [editLead, setEditLead] = React.useState<Lead | null>(null)
   const [period, setPeriod] = React.useState<Period>("Month")
@@ -758,6 +771,22 @@ export default function Page() {
     { scope: odRef, dependencies: [od] }
   )
 
+  // Bell badge: a small pop when the count changes (not on first show).
+  const pending = [...overdue, ...today.filter((l) => !l.follow_up_done_at)]
+  useGSAP(
+    () => {
+      const was = bellCount.current
+      bellCount.current = pending.length
+      if (was === null || was === pending.length || reduceMotion()) return
+      gsap.fromTo(
+        "[data-bell-badge]",
+        { scale: 0.6 },
+        { scale: 1, duration: 0.25, ease: "power3.out", clearProps: "scale" }
+      )
+    },
+    { scope: contentRef, dependencies: [pending.length] }
+  )
+
   // Rail highlight: one pill slides to the active row instead of each row
   // swapping its own background. Placed without motion on first render.
   const pillPlaced = React.useRef(false)
@@ -1153,6 +1182,53 @@ export default function Page() {
       })
     })()
 
+  /** Download the selected period's report as CSV: summary, chart bars,
+   *  funnel and sources, from the report already loaded for this tab. */
+  const exportReport = () => {
+    const unit = { Week: "day", Month: "month", Quarter: "quarter" }[period]
+    const rows: (string | number | null)[][] = [
+      ["LeadFlow report", PERIOD_LABEL[period]],
+      ["Exported", new Date().toLocaleString("en-IN")],
+      [],
+      ["Summary"],
+      ["Revenue won (₹)", rep.revenue],
+      ["Deals won", rep.deals_won],
+      ["Avg. deal size (₹)", rep.avg_deal],
+      ["Avg. time to close (days)", rep.avg_days_to_close],
+      ["Win rate (%)", rep.win_rate],
+      ["Win rate last " + period.toLowerCase() + " (%)", rep.prev_win_rate],
+      ["Leads created", rep.leads],
+      [],
+      ["Revenue by " + unit],
+      [unit[0].toUpperCase() + unit.slice(1), "Revenue (₹)"],
+      ...rep.bars.map((b) => [b.label, b.value]),
+      [],
+      ["Conversion by stage"],
+      ["Stage", "Leads", "Value (₹)"],
+      ...rep.funnel.map((f) => [f.status, f.count, f.value]),
+      [],
+      ["Lead sources"],
+      ["Source", "Leads", "Share (%)"],
+      ...rep.sources.map((x) => [x.source || "Not recorded", x.count, x.share]),
+    ]
+    const csv = rows.map((r) => r.map(csvCell).join(",")).join("\r\n")
+    // BOM so spreadsheet apps read ₹ and other UTF-8 correctly.
+    const url = URL.createObjectURL(
+      new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" })
+    )
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `leadflow-report-${PERIOD_KEY[period]}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Report downloaded.")
+    clearTimeout(exportTimer.current)
+    setExported(true)
+    exportTimer.current = setTimeout(() => setExported(false), 1500)
+  }
+
   const railNotch = (title: string, sub?: string) => (
     <Notch corner="tl" className="flex items-center gap-2">
       <RoundButton
@@ -1194,16 +1270,86 @@ export default function Page() {
       <Moon {...ic} className="dark:hidden" />
     </RoundButton>
   )
+  // Bell: how many follow-ups need you (overdue + still to do today); the
+  // menu lists them, and an item opens that lead.
   const bellButton = (
-    <RoundButton
-      data-flip-id="btn-bell"
-      title="Notifications"
-      onClick={() => go(2)}
-      className="relative"
-    >
-      <Bell {...ic} />
-      <span className="absolute top-[19px] right-[21px] size-2 rounded-full bg-highlight shadow-[0_0_0_2px_var(--background)]" />
-    </RoundButton>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <RoundButton
+            data-flip-id="btn-bell"
+            title={
+              pending.length
+                ? `${pending.length} follow-up${pending.length === 1 ? "" : "s"} need you`
+                : "Notifications"
+            }
+            className="relative transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:active:scale-100"
+          />
+        }
+      >
+        <Bell {...ic} />
+        {pending.length > 0 && (
+          <span
+            data-bell-badge
+            className="absolute top-3 right-3 grid h-5 min-w-5 place-items-center rounded-full bg-highlight px-1 text-[11px] leading-none font-medium text-white tabular-nums shadow-[0_0_0_2px_var(--background)]"
+          >
+            {pending.length > 9 ? "9+" : pending.length}
+          </span>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={8} className="w-80">
+        {pending.length === 0 && (
+          <div className="px-3 py-4 text-sm text-muted-foreground">
+            You&apos;re all caught up.
+          </div>
+        )}
+        {overdue.length > 0 && (
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Overdue</DropdownMenuLabel>
+            {overdue.map((l) => (
+              <DropdownMenuItem key={l.id} onClick={() => openLead(l.id)}>
+                <span className="size-2 flex-none rounded-full bg-highlight" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{l.name}</span>
+                  <span className="truncate text-xs font-normal text-muted-foreground">
+                    {overdueNote(l)}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+        )}
+        {today.some((l) => !l.follow_up_done_at) && (
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Today</DropdownMenuLabel>
+            {today
+              .filter((l) => !l.follow_up_done_at)
+              .map((l) => (
+                <DropdownMenuItem key={l.id} onClick={() => openLead(l.id)}>
+                  <span className="w-11 flex-none text-xs text-muted-foreground tabular-nums">
+                    {hhmm(l.next_follow_up_at)}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{l.name}</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground">
+                      {l.last_note?.note ?? l.company}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              ))}
+          </DropdownMenuGroup>
+        )}
+        {view !== 2 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => go(2)}>
+              Open Follow-ups
+              <ArrowRight {...sm} className="ml-auto" />
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
   const addButton = (
     <Button
@@ -2168,11 +2314,27 @@ export default function Page() {
                     <Button
                       size="icon-lg"
                       className="size-16 min-w-16 rounded-full p-0"
-                      aria-label="Export report"
-                      title="Export report"
-                      onClick={() => toast.success("Report exported.")}
+                      aria-label="Export report as CSV"
+                      title="Export report as CSV"
+                      onClick={exportReport}
                     >
-                      <Download {...ic} className="size-5" />
+                      {/* Download and check share one cell and swap. */}
+                      <span className="grid *:transition-[opacity,scale] *:duration-200 *:ease-out *:[grid-area:1/1] motion-reduce:*:transition-none">
+                        <Download
+                          {...ic}
+                          className={cn(
+                            "size-5",
+                            exported ? "scale-75 opacity-0" : "opacity-100"
+                          )}
+                        />
+                        <Check
+                          {...ic}
+                          className={cn(
+                            "size-5",
+                            exported ? "opacity-100" : "scale-75 opacity-0"
+                          )}
+                        />
+                      </span>
                     </Button>
                   )}
                 </Notch>
@@ -2897,6 +3059,11 @@ const byDay = (list: Lead[]) => {
     groups.set(day, [...(groups.get(day) ?? []), l])
   }
   return [...groups]
+}
+/** One CSV cell: quoted when it holds a comma, quote or line break. */
+const csvCell = (v: string | number | null) => {
+  const t = v == null ? "" : String(v)
+  return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
 }
 /** Unwrap an SDK result: hand the data to `apply`, or throw the API error. */
 async function got<T>(
