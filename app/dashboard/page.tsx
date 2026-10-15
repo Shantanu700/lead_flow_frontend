@@ -43,6 +43,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -90,7 +97,7 @@ if (process.env.NODE_ENV !== "production" && typeof window !== "undefined")
 
 const ic = { size: 20, strokeWidth: 1.75 }
 const sm = { size: 16, strokeWidth: 1.75 }
-const LEAD_COLS = "minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) 110px"
+const LEAD_COLS = "minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) 110px 36px"
 
 export default function Page() {
   const user = useSession()
@@ -130,13 +137,7 @@ export default function Page() {
   // current page doesn't empty the sheet.
   const [selLead, setSelLead] = React.useState<Lead | null>(null)
   const [add, setAdd] = React.useState(false)
-  const [form, setForm] = React.useState({
-    name: "",
-    company: "",
-    phone: "",
-    value: "",
-    source: "" as SourceEnum | "",
-  })
+  const [form, setForm] = React.useState(BLANK_FORM)
   const [note, setNote] = React.useState("")
   const [fuOn, setFuOn] = React.useState(false)
   const [fuDate, setFuDate] = React.useState("")
@@ -158,17 +159,8 @@ export default function Page() {
   // Each lead's discussions, newest first, fetched when its sheet opens.
   const [talk, setTalk] = React.useState<Record<number, Discussion[]>>({})
   const [saving, setSaving] = React.useState(false)
-  // Editing the open lead's details in its sheet.
-  const [editing, setEditing] = React.useState(false)
-  const [draft, setDraft] = React.useState(BLANK_DRAFT)
-  // "✓ Saved" beside Edit for a moment after a successful edit.
-  const [saved, setSaved] = React.useState(false)
-  const savedTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
-  const flashSaved = () => {
-    clearTimeout(savedTimer.current)
-    setSaved(true)
-    savedTimer.current = setTimeout(() => setSaved(false), 1500)
-  }
+  // The lead dialog edits this lead; null means it adds a new one.
+  const [editLead, setEditLead] = React.useState<Lead | null>(null)
   const [period, setPeriod] = React.useState<Period>("Month")
   const [mode, setMode] = React.useState<"Count" | "Value">("Count")
 
@@ -935,52 +927,27 @@ export default function Page() {
     setOverdue(swap)
     setUpcoming(swap)
   }
-  const startEdit = () => {
-    if (!selLead) return
-    setDraft({
-      name: selLead.name,
-      company: selLead.company ?? "",
-      phone: selLead.phone ?? "",
-      value: String(selLead.value ?? 0),
-      source: selLead.source ?? "",
+  // Row pencil: the lead dialog, prefilled, in edit mode.
+  const openEdit = (lead: Lead) => {
+    setEditLead(lead)
+    setForm({
+      name: lead.name,
+      company: lead.company ?? "",
+      phone: lead.phone ?? "",
+      value: String(lead.value ?? 0),
+      source: lead.source ?? "",
     })
-    setEditing(true)
+    setAdd(true)
   }
-  // Sends only what changed; the sheet and lists update from the server's
-  // answer. On failure the form stays open with the edits.
-  const saveEdit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selLead || !draft.name.trim() || saving) return
-    const next = {
-      name: draft.name.trim(),
-      company: draft.company.trim(),
-      phone: draft.phone.trim(),
-      value: Math.max(0, Math.round(Number(draft.value) || 0)),
-      source: draft.source,
+  // Header +: a blank dialog (an unsaved new-lead draft is kept).
+  const openAdd = () => {
+    if (editLead) {
+      setEditLead(null)
+      setForm(BLANK_FORM)
     }
-    const body = Object.fromEntries(
-      Object.entries(next).filter(
-        ([k, v]) =>
-          v !== (selLead[k as keyof typeof next] ?? (k === "value" ? 0 : ""))
-      )
-    )
-    if (!Object.keys(body).length) return setEditing(false)
-    setSaving(true)
-    try {
-      await got(putApiLead({ path: { id: selLead.id }, body }), merge)
-      setEditing(false)
-      flashSaved()
-      toast.success("Lead updated.")
-      refresh()
-    } catch (error) {
-      toast.error(describeApiError(error))
-    } finally {
-      setSaving(false)
-    }
+    setAdd(true)
   }
   const openLead = (id: number) => {
-    setEditing(false)
-    setSaved(false)
     setSelLead(
       [...list.results, ...today, ...overdue, ...upcoming].find(
         (l) => l.id === id
@@ -1005,28 +972,40 @@ export default function Page() {
     }
   }
   // Saves show only what the server confirmed; on failure the form keeps
-  // everything typed.
+  // everything typed. Editing sends only the fields that changed.
   const saveLead = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim() || saving) return
+    const fields = {
+      name: form.name.trim(),
+      company: form.company.trim(),
+      phone: form.phone.trim(),
+      value: Math.max(0, Math.round(Number(form.value) || 0)),
+      source: form.source,
+    }
+    const was = editLead
+    const changed = was
+      ? Object.fromEntries(
+          Object.entries(fields).filter(
+            ([k, v]) =>
+              v !== (was[k as keyof typeof fields] ?? (k === "value" ? 0 : ""))
+          )
+        )
+      : fields
+    if (was && !Object.keys(changed).length) return setAdd(false)
     setSaving(true)
     try {
-      await got(
-        postApiLeads({
-          body: {
-            name: form.name.trim(),
-            company: form.company.trim(),
-            phone: form.phone.trim(),
-            value: Math.max(0, Math.round(Number(form.value) || 0)),
-            source: form.source,
-          },
-        }),
-        () => {}
-      )
-      setForm({ name: "", company: "", phone: "", value: "", source: "" })
+      if (was) {
+        await got(putApiLead({ path: { id: was.id }, body: changed }), merge)
+        toast.success("Lead updated.")
+      } else {
+        await got(postApiLeads({ body: fields }), () => {})
+        pickFilter("All")
+        toast.success("Lead saved.")
+      }
+      setForm(BLANK_FORM)
+      setEditLead(null)
       setAdd(false)
-      pickFilter("All")
-      toast.success("Lead saved.")
       refresh()
     } catch (error) {
       toast.error(describeApiError(error))
@@ -1232,7 +1211,7 @@ export default function Page() {
       className="size-16 min-w-16 rounded-full p-0"
       aria-label="Add lead"
       title="Add lead"
-      onClick={() => setAdd(true)}
+      onClick={openAdd}
     >
       <Plus {...ic} className="size-5" />
     </Button>
@@ -1714,7 +1693,11 @@ export default function Page() {
                     View all leads <ArrowRight {...sm} />
                   </button>
                 </Notch>
-                <LeadTable rows={list.results} onOpen={openLead} />
+                <LeadTable
+                  rows={list.results}
+                  onOpen={openLead}
+                  onEdit={openEdit}
+                />
               </section>
             </>
           )}
@@ -1872,7 +1855,11 @@ export default function Page() {
                     </div>
                   </div>
                 </Notch>
-                <LeadTable rows={list.results} onOpen={openLead} />
+                <LeadTable
+                  rows={list.results}
+                  onOpen={openLead}
+                  onEdit={openEdit}
+                />
               </section>
             </div>
           )}
@@ -2317,121 +2304,16 @@ export default function Page() {
           <CloseButton onClick={() => setSheet(false)} />
           <SheetHeader>
             <SheetTitle>{selLead?.name}</SheetTitle>
-            {editing ? (
-              <form onSubmit={saveEdit} className="flex flex-col gap-3 pt-2">
-                <SheetDescription className="sr-only">
-                  Edit this lead&apos;s details.
-                </SheetDescription>
-                {(
-                  [
-                    ["name", "Full name", "text"],
-                    ["company", "Company", "text"],
-                    ["phone", "Phone", "tel"],
-                    ["value", "Estimated value (₹)", "number"],
-                  ] as const
-                ).map(([key, label, type], i) => (
-                  <div
-                    key={key}
-                    className={cn("flex flex-col gap-1.5", CASCADE)}
-                    style={{ animationDelay: i * 30 + "ms" }}
-                  >
-                    <Label htmlFor={"edit-" + key}>{label}</Label>
-                    <Input
-                      id={"edit-" + key}
-                      type={type}
-                      required={key === "name"}
-                      {...(key === "value" && {
-                        min: 0,
-                        step: 1,
-                        inputMode: "numeric" as const,
-                      })}
-                      value={draft[key]}
-                      onChange={(e) =>
-                        setDraft({ ...draft, [key]: e.target.value })
-                      }
-                    />
-                  </div>
-                ))}
-                <div
-                  className={cn("flex flex-col gap-1.5", CASCADE)}
-                  style={{ animationDelay: "120ms" }}
-                >
-                  <Label htmlFor="edit-source">Source</Label>
-                  <select
-                    id="edit-source"
-                    value={draft.source}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        source: e.target.value as SourceEnum,
-                      })
-                    }
-                    className={SELECT_CLASS}
-                  >
-                    <option value="">Not recorded</option>
-                    {SOURCE_OPTIONS.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
-                <div
-                  className={cn("flex gap-2 pt-1", CASCADE)}
-                  style={{ animationDelay: "150ms" }}
-                >
-                  <Button
-                    type="submit"
-                    disabled={!draft.name.trim() || saving}
-                    className="flex-1"
-                  >
-                    {saving ? "Saving…" : "Save changes"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setEditing(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="flex animate-in flex-wrap items-center justify-between gap-2 duration-200 fade-in-0 motion-reduce:animate-none">
-                <SheetDescription>
-                  {[
-                    selLead?.company,
-                    selLead?.phone,
-                    selLead?.source,
-                    money(selLead?.value ?? 0),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </SheetDescription>
-                <span className="flex items-center gap-2">
-                  <span
-                    aria-live="polite"
-                    className={cn(
-                      "flex items-center gap-1 text-xs text-muted-foreground transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none",
-                      saved ? "opacity-100" : "translate-x-1 opacity-0"
-                    )}
-                  >
-                    {saved && (
-                      <>
-                        <Check size={12} strokeWidth={2} />
-                        Saved
-                      </>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={startEdit}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition-[background-color,transform] duration-150 ease-out hover:bg-secondary active:scale-[0.97] motion-reduce:active:scale-100"
-                  >
-                    <Pencil size={12} strokeWidth={1.75} />
-                    Edit
-                  </button>
-                </span>
-              </div>
-            )}
+            <SheetDescription>
+              {[
+                selLead?.company,
+                selLead?.phone,
+                selLead?.source,
+                money(selLead?.value ?? 0),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </SheetDescription>
           </SheetHeader>
           <div
             role="group"
@@ -2542,8 +2424,14 @@ export default function Page() {
           <CloseButton onClick={() => setAdd(false)} />
           <form onSubmit={saveLead} className="contents">
             <DialogHeader>
-              <DialogTitle>Add new lead</DialogTitle>
-              <DialogDescription>Only the name is required.</DialogDescription>
+              <DialogTitle>
+                {editLead ? "Edit lead" : "Add new lead"}
+              </DialogTitle>
+              <DialogDescription>
+                {editLead
+                  ? "Only the fields you change are saved."
+                  : "Only the name is required."}
+              </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-3.5">
               {(
@@ -2575,24 +2463,32 @@ export default function Page() {
               ))}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="lead-source">Source</Label>
-                <select
-                  id="lead-source"
-                  value={form.source}
-                  onChange={(e) =>
-                    setForm({ ...form, source: e.target.value as SourceEnum })
+                <Select
+                  items={SOURCE_ITEMS}
+                  value={form.source || NO_SOURCE}
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      source: v === NO_SOURCE ? "" : (v as SourceEnum),
+                    })
                   }
-                  className={SELECT_CLASS}
                 >
-                  <option value="">Not recorded</option>
-                  {SOURCE_OPTIONS.map((o) => (
-                    <option key={o}>{o}</option>
-                  ))}
-                </select>
+                  <SelectTrigger id="lead-source" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_ITEMS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter showCloseButton>
               <Button type="submit" disabled={!form.name.trim() || saving}>
-                Save lead
+                {saving ? "Saving…" : editLead ? "Save changes" : "Save lead"}
               </Button>
             </DialogFooter>
           </form>
@@ -2807,9 +2703,11 @@ function Avatar({ name }: { name: string }) {
 function LeadTable({
   rows,
   onOpen,
+  onEdit,
 }: {
   rows: Lead[]
   onOpen: (id: number) => void
+  onEdit: (lead: Lead) => void
 }) {
   return (
     <>
@@ -2821,16 +2719,24 @@ function LeadTable({
         <span>Status</span>
         <span>Last note</span>
         <span className="text-right">Value</span>
+        <span />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
         {rows.map((l) => (
-          <button
+          // The row is a plain container: a full-size button underneath opens
+          // the lead, and the pencil sits above it (no nested buttons).
+          <div
             key={l.id}
             data-flip-id={"lead-" + l.id}
-            onClick={() => onOpen(l.id)}
-            className="grid cursor-pointer items-center gap-3 rounded-[18px] border-0 bg-card px-4 py-3 text-left text-foreground transition-colors duration-150 hover:bg-secondary"
+            className="group relative grid items-center gap-3 rounded-[18px] bg-card py-3 pr-2.5 pl-4 text-left text-foreground transition-colors duration-150 hover:bg-secondary"
             style={{ gridTemplateColumns: LEAD_COLS }}
           >
+            <button
+              type="button"
+              aria-label={`Open ${l.name}`}
+              onClick={() => onOpen(l.id)}
+              className="absolute inset-0 cursor-pointer rounded-[inherit] border-0 bg-transparent outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+            />
             <span className="flex min-w-0 flex-col gap-px">
               <span className="truncate text-sm font-medium">{l.name}</span>
               <span className="text-xs text-muted-foreground">
@@ -2860,7 +2766,19 @@ function LeadTable({
             <span className="text-right text-[15px] font-light tabular-nums">
               {money(l.value ?? 0)}
             </span>
-          </button>
+            <button
+              type="button"
+              title="Edit lead"
+              aria-label={`Edit ${l.name}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(l)
+              }}
+              className="relative grid size-9 flex-none cursor-pointer place-items-center rounded-full border-0 bg-secondary text-muted-foreground transition-[background-color,color,transform] duration-150 ease-out group-hover:bg-card hover:bg-foreground! hover:text-card active:scale-[0.94] motion-reduce:active:scale-100"
+            >
+              <Pencil size={14} strokeWidth={1.75} />
+            </button>
+          </div>
         ))}
         {rows.length === 0 && (
           <div className="px-4 py-7 text-sm text-muted-foreground">
@@ -3114,13 +3032,7 @@ const EMPTY_REPORT: ReportsStats = {
   leads: 0,
   sources: [],
 }
-// Edit-form rows fade and drop in one after another (delay set per row).
-const CASCADE =
-  "animate-in fill-mode-both duration-200 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none"
-// Native <select> styled like the Input component.
-const SELECT_CLASS =
-  "h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-const BLANK_DRAFT = {
+const BLANK_FORM = {
   name: "",
   company: "",
   phone: "",
@@ -3134,6 +3046,12 @@ const SOURCE_OPTIONS: SourceEnum[] = [
   "Cold email",
   "Events",
   "Other",
+]
+// Source picker: "Not recorded" is the empty source.
+const NO_SOURCE = "none"
+const SOURCE_ITEMS = [
+  { value: NO_SOURCE, label: "Not recorded" },
+  ...SOURCE_OPTIONS.map((o) => ({ value: o, label: o })),
 ]
 // Segment opacity by source rank (the API sorts sources largest first).
 const ink = (rank: number) => [1, 0.78, 0.58, 0.42, 0.28][rank] ?? 0.2
