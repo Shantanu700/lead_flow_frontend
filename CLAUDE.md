@@ -30,9 +30,24 @@ No test runner is set up yet. Check UI changes in a real browser at desktop (144
 
 ## The dashboard
 
-`app/dashboard/page.tsx` is the whole app after sign-in: one client component with four tabs (Dashboard, Leads, Follow-ups, Reports) switched by state, not routes. The lead panel (sheet), the Add/Edit lead dialog and the command palette (`components/command-palette.tsx`, search button or ⌘K) open over it.
+The whole app after sign-in is `/dashboard`: four tabs (Dashboard, Leads, Follow-ups, Reports) switched by state, not routes. The lead drawer, the Add/Edit lead dialog and the command palette (search button or ⌘K) open over it.
 
-- **Layout** follows the frame width `w` from a ResizeObserver, not CSS breakpoints: `phone` (under 600px: the rail becomes a bottom tab bar and every tab stacks and scrolls), `narrow`, `compact`. Change these together.
+Where things live:
+- `app/dashboard/page.tsx`: the frame only (rail, content grid, overlays), wrapped in `DashboardContext`.
+- `app/dashboard/use-dashboard.ts`: all state, data loading and handlers (`openLead`, `saveLead`, `addNote`, `setStatus`, …). Its return value is the context; components read it with `useDash()` (`components/dashboard/context.tsx`).
+- `components/dashboard/views/`: one file per tab (`overview`, `leads`, `follow-ups`, `reports`).
+- `components/dashboard/`:
+  - `chrome.tsx`: pieces several tabs share (top-notch buttons, `Callouts`, `BigNumber`, `PeriodToggle`, `LeadControls`).
+  - `rail.tsx`, `lead-sheet.tsx`, `lead-dialog.tsx`, `lead-table.tsx`, `segmented.tsx`, plus small parts (`hero`, `buttons`, `atoms`, `popup`, `icons`).
+- `hooks/use-view-morph.ts`: the tab-switch choreography. `hooks/use-dashboard-motion.ts`: in-place animations (period roll, row reorder, filter chip, overdue card, bell).
+- `lib/`:
+  - `format.ts`: ₹, dates, "2 days ago".
+  - `leads.ts`: statuses, constants, types.
+  - `layout.ts`: breakpoints.
+  - `report-csv.ts`, `motion.ts` (`reduceMotion`).
+
+Rules:
+- **Layout** follows the frame width `w` from a ResizeObserver, not CSS breakpoints (`lib/layout.ts`): `phone` (under 600px: the rail becomes a bottom tab bar and every tab stacks and scrolls), `narrow`, `compact`. Change these together.
 - **Animation** uses GSAP (`@gsap/react`, Flip). Tab switches morph the shared hero and notches (`data-flip-id`; `SHAPE_IDS` / `VIEW_FLIP` list what each view renders) and roll changing text (`data-roll`). Keep those attributes when editing markup, and keep animations working; the user checks them closely.
 - **Notches** (`components/notch.tsx`) are the card-coloured corner cut-outs that hold controls.
 - **Data:** each tab loads only what it shows, and search, filters, sorting and paging all happen on the server (`GET /api/leads/?page=&status=&q=&ordering=`). Do not filter or sort in the browser. Per-tab figures come from `/api/stats/dashboard|leads|reports/`.
