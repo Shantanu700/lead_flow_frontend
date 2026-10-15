@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteCoreLoginData, DeleteCoreLoginErrors, DeleteCoreLoginResponses, GetCoreCsrfData, GetCoreCsrfErrors, GetCoreCsrfResponses, GetCoreLoginData, GetCoreLoginErrors, GetCoreLoginResponses, PostCoreLoginData, PostCoreLoginErrors, PostCoreLoginResponses, PostCoreRegisterData, PostCoreRegisterErrors, PostCoreRegisterResponses } from './types.gen';
+import type { DeleteCoreLoginData, DeleteCoreLoginErrors, DeleteCoreLoginResponses, GetApiFollowUpsOverdueData, GetApiFollowUpsOverdueErrors, GetApiFollowUpsOverdueResponses, GetApiFollowUpsTodayData, GetApiFollowUpsTodayErrors, GetApiFollowUpsTodayResponses, GetApiFollowUpsUpcomingData, GetApiFollowUpsUpcomingErrors, GetApiFollowUpsUpcomingResponses, GetApiLeadData, GetApiLeadErrors, GetApiLeadResponses, GetApiLeadsData, GetApiLeadsDiscussionsData, GetApiLeadsDiscussionsErrors, GetApiLeadsDiscussionsResponses, GetApiLeadsErrors, GetApiLeadsResponses, GetApiStatsDashboardData, GetApiStatsDashboardErrors, GetApiStatsDashboardResponses, GetApiStatsLeadsData, GetApiStatsLeadsErrors, GetApiStatsLeadsResponses, GetApiStatsReportsData, GetApiStatsReportsErrors, GetApiStatsReportsResponses, GetCoreCsrfData, GetCoreCsrfErrors, GetCoreCsrfResponses, GetCoreLoginData, GetCoreLoginErrors, GetCoreLoginResponses, PostApiLeadsData, PostApiLeadsDiscussionsData, PostApiLeadsDiscussionsErrors, PostApiLeadsDiscussionsResponses, PostApiLeadsErrors, PostApiLeadsResponses, PostCoreLoginData, PostCoreLoginErrors, PostCoreLoginResponses, PostCoreRegisterData, PostCoreRegisterErrors, PostCoreRegisterResponses, PutApiLeadData, PutApiLeadErrors, PutApiLeadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,174 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Open leads whose follow-up was due before today and isn't done, oldest first.
+ */
+export const getApiFollowUpsOverdue = <ThrowOnError extends boolean = false>(options?: Options<GetApiFollowUpsOverdueData, ThrowOnError>): RequestResult<GetApiFollowUpsOverdueResponses, GetApiFollowUpsOverdueErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFollowUpsOverdueResponses, GetApiFollowUpsOverdueErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/follow-ups/overdue/',
+    ...options
+});
+
+/**
+ * Leads with a follow-up due today (app timezone), earliest first.
+ */
+export const getApiFollowUpsToday = <ThrowOnError extends boolean = false>(options?: Options<GetApiFollowUpsTodayData, ThrowOnError>): RequestResult<GetApiFollowUpsTodayResponses, GetApiFollowUpsTodayErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFollowUpsTodayResponses, GetApiFollowUpsTodayErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/follow-ups/today/',
+    ...options
+});
+
+/**
+ * Follow-ups in the 7 days after today that aren't done, earliest first.
+ */
+export const getApiFollowUpsUpcoming = <ThrowOnError extends boolean = false>(options?: Options<GetApiFollowUpsUpcomingData, ThrowOnError>): RequestResult<GetApiFollowUpsUpcomingResponses, GetApiFollowUpsUpcomingErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFollowUpsUpcomingResponses, GetApiFollowUpsUpcomingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/follow-ups/upcoming/',
+    ...options
+});
+
+/**
+ * Leads, a page at a time, filtered and sorted on the server (GET); create (POST).
+ */
+export const getApiLeads = <ThrowOnError extends boolean = false>(options?: Options<GetApiLeadsData, ThrowOnError>): RequestResult<GetApiLeadsResponses, GetApiLeadsErrors, ThrowOnError> => (options?.client ?? client).get<GetApiLeadsResponses, GetApiLeadsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/leads/',
+    ...options
+});
+
+/**
+ * Leads, a page at a time, filtered and sorted on the server (GET); create (POST).
+ */
+export const postApiLeads = <ThrowOnError extends boolean = false>(options: Options<PostApiLeadsData, ThrowOnError>): RequestResult<PostApiLeadsResponses, PostApiLeadsErrors, ThrowOnError> => (options.client ?? client).post<PostApiLeadsResponses, PostApiLeadsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/leads/',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * One lead (GET); update status or other fields (PUT, send only what changes).
+ */
+export const getApiLead = <ThrowOnError extends boolean = false>(options: Options<GetApiLeadData, ThrowOnError>): RequestResult<GetApiLeadResponses, GetApiLeadErrors, ThrowOnError> => (options.client ?? client).get<GetApiLeadResponses, GetApiLeadErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/leads/{id}/',
+    ...options
+});
+
+/**
+ * One lead (GET); update status or other fields (PUT, send only what changes).
+ */
+export const putApiLead = <ThrowOnError extends boolean = false>(options: Options<PutApiLeadData, ThrowOnError>): RequestResult<PutApiLeadResponses, PutApiLeadErrors, ThrowOnError> => (options.client ?? client).put<PutApiLeadResponses, PutApiLeadErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/leads/{id}/',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * A lead's discussions, newest first (GET); add one (POST).
+ */
+export const getApiLeadsDiscussions = <ThrowOnError extends boolean = false>(options: Options<GetApiLeadsDiscussionsData, ThrowOnError>): RequestResult<GetApiLeadsDiscussionsResponses, GetApiLeadsDiscussionsErrors, ThrowOnError> => (options.client ?? client).get<GetApiLeadsDiscussionsResponses, GetApiLeadsDiscussionsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/leads/{id}/discussions/',
+    ...options
+});
+
+/**
+ * A lead's discussions, newest first (GET); add one (POST).
+ */
+export const postApiLeadsDiscussions = <ThrowOnError extends boolean = false>(options: Options<PostApiLeadsDiscussionsData, ThrowOnError>): RequestResult<PostApiLeadsDiscussionsResponses, PostApiLeadsDiscussionsErrors, ThrowOnError> => (options.client ?? client).post<PostApiLeadsDiscussionsResponses, PostApiLeadsDiscussionsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/leads/{id}/discussions/',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Figures for the Dashboard tab.
+ */
+export const getApiStatsDashboard = <ThrowOnError extends boolean = false>(options?: Options<GetApiStatsDashboardData, ThrowOnError>): RequestResult<GetApiStatsDashboardResponses, GetApiStatsDashboardErrors, ThrowOnError> => (options?.client ?? client).get<GetApiStatsDashboardResponses, GetApiStatsDashboardErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/stats/dashboard/',
+    ...options
+});
+
+/**
+ * Figures for the Leads tab.
+ */
+export const getApiStatsLeads = <ThrowOnError extends boolean = false>(options?: Options<GetApiStatsLeadsData, ThrowOnError>): RequestResult<GetApiStatsLeadsResponses, GetApiStatsLeadsErrors, ThrowOnError> => (options?.client ?? client).get<GetApiStatsLeadsResponses, GetApiStatsLeadsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/stats/leads/',
+    ...options
+});
+
+/**
+ * Figures for the Reports tab, for this week, month or quarter.
+ */
+export const getApiStatsReports = <ThrowOnError extends boolean = false>(options?: Options<GetApiStatsReportsData, ThrowOnError>): RequestResult<GetApiStatsReportsResponses, GetApiStatsReportsErrors, ThrowOnError> => (options?.client ?? client).get<GetApiStatsReportsResponses, GetApiStatsReportsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/stats/reports/',
+    ...options
+});
 
 /**
  * Issue a CSRF token (and cookie). Send it as X-CSRFToken on authenticated writes.

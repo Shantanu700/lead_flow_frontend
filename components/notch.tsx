@@ -121,7 +121,9 @@ export function Notch({
           data-fillet={role}
           className={cn(
             "pointer-events-none absolute",
-            role === "fly" && "opacity-0"
+            // Out of the layout at rest: sitting past the panel's edge, it
+            // would otherwise widen the scroll area.
+            role === "fly" && "hidden"
           )}
           style={{ ...pos, width: R, height: R, background: fillet(at) }}
         />

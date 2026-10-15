@@ -26,7 +26,7 @@ import gsap from "gsap"
 import { Flip } from "gsap/Flip"
 import { toast } from "sonner"
 
-import { refreshCsrf } from "@/lib/api"
+import { describeApiError, OFFLINE, refreshCsrf } from "@/lib/api"
 import { NOTCH_R, Notch } from "@/components/notch"
 import { useSession } from "@/components/session"
 import { useThemeToggle } from "@/components/theme-provider"
@@ -49,26 +49,33 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { deleteCoreLogin } from "@/src/client/sdk.gen"
+import {
+  deleteCoreLogin,
+  getApiFollowUpsOverdue,
+  getApiFollowUpsToday,
+  getApiFollowUpsUpcoming,
+  getApiLeads,
+  getApiLeadsDiscussions,
+  getApiStatsDashboard,
+  getApiStatsLeads,
+  getApiStatsReports,
+  postApiLeads,
+  postApiLeadsDiscussions,
+  putApiLead,
+} from "@/src/client/sdk.gen"
+import type {
+  DashboardStats,
+  Discussion,
+  Lead,
+  LeadsStats,
+  PaginatedLead,
+  ReportsStats,
+  SourceEnum,
+} from "@/src/client/types.gen"
 import { cn } from "@/lib/utils"
 
-// ponytail: sample data until /api/leads/ exists; swap state seeds for SDK calls.
-
 type Status = (typeof STAGES)[number][0]
-type Lead = {
-  id: number
-  name: string
-  company: string
-  phone: string
-  status: Status
-  last: string
-  value: number
-  /** Latest discussion note, previewed in the list. */
-  note: string
-  /** Next follow-up set from a note ("" when none). */
-  next: string
-  created: string
-}
+type Period = (typeof PERIODS)[number]
 /** A timeline entry. System events (lead created) aren't discussions. */
 type Note = { date: string; note: string; follow?: string; system?: boolean }
 type Sort = "Recent" | "Value" | "Name"
@@ -113,33 +120,44 @@ export default function Page() {
   const [filter, setFilter] = React.useState<"All" | Status>("All")
   const [q, setQ] = React.useState("")
   const [pageIdx, setPage] = React.useState(0)
-  const [fu, setFu] = React.useState(FU.map((f) => f.done))
   // Today's follow-up strip: which ends it can still scroll towards.
   const stripRef = React.useRef<HTMLDivElement>(null)
   const [stripEdge, setStripEdge] = React.useState({ start: true, end: true })
   const [od, setOd] = React.useState(0)
   const [sheet, setSheet] = React.useState(false)
-  const [sel, setSel] = React.useState(1)
+  // The lead open in the sheet; kept here so a save that moves it off the
+  // current page doesn't empty the sheet.
+  const [selLead, setSelLead] = React.useState<Lead | null>(null)
   const [add, setAdd] = React.useState(false)
   const [form, setForm] = React.useState({
     name: "",
     company: "",
     phone: "",
     value: "",
+    source: "" as SourceEnum | "",
   })
   const [note, setNote] = React.useState("")
   const [fuOn, setFuOn] = React.useState(false)
   const [fuDate, setFuDate] = React.useState("")
   const [fuTime, setFuTime] = React.useState("")
   const [sort, setSort] = React.useState<Sort>("Recent")
-  const [leads, setLeads] = React.useState(LEADS)
-  // Each lead's discussions, newest first; seeded with its latest note.
-  const [notes, setNotes] = React.useState<Record<number, Note[]>>(() =>
-    Object.fromEntries(
-      LEADS.map((l) => [l.id, [{ date: l.last, note: l.note }]])
-    )
-  )
-  const [period, setPeriod] = React.useState<keyof typeof SERIES>("Month")
+  // Server data. Each tab loads only what it shows (see `load`).
+  const [ready, setReady] = React.useState(false)
+  // One page of the lead list, filtered, searched and sorted by the server.
+  const [list, setList] = React.useState<PaginatedLead>(EMPTY_PAGE)
+  const listSeq = React.useRef(0)
+  const [dash, setDash] = React.useState<DashboardStats | null>(null)
+  const [leadStats, setLeadStats] = React.useState<LeadsStats | null>(null)
+  const [reports, setReports] = React.useState<
+    Partial<Record<Period, ReportsStats>>
+  >({})
+  const [today, setToday] = React.useState<Lead[]>([])
+  const [overdue, setOverdue] = React.useState<Lead[]>([])
+  const [upcoming, setUpcoming] = React.useState<Lead[]>([])
+  // Each lead's discussions, newest first, fetched when its sheet opens.
+  const [talk, setTalk] = React.useState<Record<number, Discussion[]>>({})
+  const [saving, setSaving] = React.useState(false)
+  const [period, setPeriod] = React.useState<Period>("Month")
   const [mode, setMode] = React.useState<"Count" | "Value">("Count")
 
   // View change. Whatever both views share morphs instead of fading:
@@ -329,17 +347,12 @@ export default function Page() {
   // Ids each view renders, so the exit knows what will survive the swap.
   // Lead rows are added from the data (see rowIds).
   const rowIds = (v: number) =>
-    (v === 0
-      ? shown.slice(0, 5)
-      : v === 1
-        ? shown.slice(page * 10, page * 10 + 10)
-        : []
-    ).map((l) => "lead-" + l.id)
+    (v === 0 || v === 1 ? list.results : []).map((l) => "lead-" + l.id)
 
   useGSAP(
     () => {
       const grid = contentRef.current
-      if (!grid) return
+      if (!grid || !ready) return
       const shapeEls = shape()
       const bars = grid.querySelectorAll("[data-bar]")
       const from = flipState.current
@@ -449,8 +462,8 @@ export default function Page() {
             )
             gsap.fromTo(
               att.querySelectorAll("[data-fillet=fly]"),
-              { opacity: 1 },
-              { opacity: 0, clearProps: "opacity", ...land }
+              { opacity: 1, display: "block" },
+              { opacity: 0, clearProps: "opacity,display", ...land }
             )
           }
         }
@@ -489,8 +502,81 @@ export default function Page() {
           }
         )
     },
-    { scope: contentRef, dependencies: [view], revertOnUpdate: true }
+    { scope: contentRef, dependencies: [view, ready], revertOnUpdate: true }
   )
+
+  /** Fetch the lead page tab `v` shows. The server does all the filtering,
+   *  searching and sorting: 5 rows on the Dashboard (status filter only),
+   *  10 on Leads (filter, search, sort, page). */
+  const fetchList = async (v: number) => {
+    const seq = ++listSeq.current
+    const { data, error, response } = await getApiLeads({
+      query: {
+        status: filter === "All" ? undefined : filter,
+        ...(v === 1
+          ? {
+              q: q.trim() || undefined,
+              ordering: SORT_KEY[sort],
+              page: pageIdx + 1,
+              page_size: 10,
+            }
+          : { page_size: 5 }),
+      },
+    })
+    if (seq !== listSeq.current) return // a newer request superseded this one
+    // The page ran off the end (e.g. after a status change): back to page 1.
+    if (response?.status === 404 && pageIdx > 0) return setPage(0)
+    if (error !== undefined || !data) throw error ?? new Error()
+    setList(data)
+  }
+  /** Fetch what tab `v` shows (and nothing else). Resolves when it's in;
+   *  a failure shows a toast and resolves anyway, so the tab still opens. */
+  const load = (v: number, p: Period = period) => {
+    const jobs =
+      v === 0
+        ? [
+            got(getApiStatsDashboard(), setDash),
+            got(getApiFollowUpsToday(), setToday),
+            got(getApiFollowUpsOverdue(), setOverdue),
+            fetchList(0),
+          ]
+        : v === 1
+          ? [got(getApiStatsLeads(), setLeadStats), fetchList(1)]
+          : v === 2
+            ? [
+                got(getApiFollowUpsToday(), setToday),
+                got(getApiFollowUpsOverdue(), setOverdue),
+                got(getApiFollowUpsUpcoming(), setUpcoming),
+              ]
+            : [
+                got(
+                  getApiStatsReports({ query: { period: PERIOD_KEY[p] } }),
+                  (r) => setReports((all) => ({ ...all, [p]: r }))
+                ),
+              ]
+    return Promise.all(jobs).then(
+      () => {},
+      (error) => {
+        toast.error(
+          error instanceof TypeError ? OFFLINE : describeApiError(error),
+          {
+            id: "load-failed",
+          }
+        )
+      }
+    )
+  }
+  // After a save: refresh what the open tab shows (stats, follow-up lists).
+  const refresh = () => void load(view)
+
+  // First data, then the entrance plays (the view effect waits for `ready`).
+  // Deferred a tick: React's dev double-mount cancels the first timer, so
+  // the data loads once.
+  React.useEffect(() => {
+    const t = setTimeout(() => void load(0).then(() => setReady(true)))
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, [])
 
   const { contextSafe } = useGSAP({ scope: contentRef })
   // contextSafe at click time, so the exit tweens join the GSAP context.
@@ -498,9 +584,10 @@ export default function Page() {
     contextSafe(() => {
       if (next === view || switching.current) return
       setNav(next)
-      if (reduceMotion()) return setView(next)
+      // Fetch while the old tab exits, so the morph lands on real figures.
+      const loaded = load(next)
       const grid = contentRef.current
-      if (!grid) return setView(next)
+      if (reduceMotion() || !grid) return void loaded.then(() => setView(next))
       switching.current = true
       gsap.set(grid, { overflow: "hidden" })
 
@@ -528,8 +615,10 @@ export default function Page() {
           prevIds.current = new Set(kept.map(idOf))
           attFrom.current = shapeEls.find((el) => idOf(el) === "notch-att")
             ?.dataset.notch
-          switching.current = false
-          setView(next)
+          loaded.then(() => {
+            switching.current = false
+            setView(next)
+          })
         },
       })
       tl.to(leaving, { opacity: 0, duration: 0.2, transition: "none" }, 0)
@@ -587,7 +676,7 @@ export default function Page() {
           ),
       })
     },
-    { scope: contentRef, dependencies: [sort, filter, q, leads] }
+    { scope: contentRef, dependencies: [list] }
   )
 
   // Rail highlight: one pill slides to the active row instead of each row
@@ -666,41 +755,55 @@ export default function Page() {
   const subVisible = cw >= 1000
   const pageStyle: React.CSSProperties = { gridColumn: "1 / -1" }
 
-  const today = new Date()
-  const todayShort = today.toLocaleDateString("en-IN", {
+  const todayShort = new Date().toLocaleDateString("en-IN", {
     weekday: "short",
     day: "numeric",
     month: "short",
   })
 
-  const shown = leads
-    .filter(
-      (l) =>
-        (filter === "All" || l.status === filter) &&
-        (l.name + l.company + l.note).toLowerCase().includes(q.toLowerCase())
-    )
-    .sort((a, b) =>
-      sort === "Value"
-        ? b.value - a.value
-        : sort === "Name"
-          ? a.name.localeCompare(b.name)
-          : agoRank(a.last) - agoRank(b.last)
-    )
-  const pageCount = Math.max(1, Math.ceil(shown.length / 10))
-  const page = Math.min(pageIdx, pageCount - 1)
-  const selLead = leads.find((l) => l.id === sel) ?? leads[0]
-  const timeline: Note[] = [
-    ...(notes[selLead.id] ?? []),
-    { date: selLead.created, note: "Lead created", system: true },
-  ]
-  const open = leads.filter((l) => l.status !== "Won" && l.status !== "Lost")
-  const closed = leads.length - open.length
-  const fuLeft = fu.filter((d) => !d).length
+  const pageCount = Math.max(1, Math.ceil(list.count / 10))
+  const page = pageIdx
+  const timeline: Note[] = selLead
+    ? [
+        ...(talk[selLead.id] ?? []).map((d) => ({
+          date: stamp(d.created_at),
+          note: d.note,
+          follow: d.follow_up_at ? stamp(d.follow_up_at) : undefined,
+        })),
+        { date: stamp(selLead.created_at), note: "Lead created", system: true },
+      ]
+    : []
+  const fuLeft = today.filter((l) => !l.follow_up_done_at).length
+  const rep = reports[period] ?? EMPTY_REPORT
+  const winNote =
+    rep.win_rate === null
+      ? "No closed deals yet"
+      : rep.prev_win_rate === null
+        ? `No closed deals last ${period.toLowerCase()}`
+        : rep.win_rate === rep.prev_win_rate
+          ? `Same as last ${period.toLowerCase()}`
+          : `${rep.win_rate > rep.prev_win_rate ? "Up" : "Down"} ${points(
+              Math.abs(rep.win_rate - rep.prev_win_rate)
+            )} on last ${period.toLowerCase()}`
+  const odLead = overdue[Math.min(od, overdue.length - 1)]
   const filterLabel = filter === "All" ? "All statuses" : filter
-  const countOf = (name: string) =>
+  /** Leads per status from the open tab's stats ("All" sums them). */
+  const countOf = (name: string, by = dash?.by_status ?? ZERO_COUNTS) =>
     name === "All"
-      ? leads.length
-      : leads.filter((l) => l.status === name).length
+      ? Object.values(by).reduce((a, n) => a + n, 0)
+      : by[name as Status]
+
+  // Filter, search, sort or page changed: fetch that page. Search waits for
+  // a pause in typing.
+  React.useEffect(() => {
+    if (!ready || (view !== 0 && view !== 1)) return
+    const t = setTimeout(
+      () => fetchList(view).catch((e) => toast.error(describeApiError(e))),
+      q ? 200 : 0
+    )
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- list inputs only
+  }, [filter, q, sort, pageIdx])
 
   // Lead rows glide to their new order when the list changes (sort, filter,
   // search, status); rows that newly appear fade in. Call before the change.
@@ -713,71 +816,133 @@ export default function Page() {
     setFilter(name)
     setPage(0)
   }
+  // Put a lead the server returned into every list that shows it.
+  const merge = (lead: Lead) => {
+    const swap = (list: Lead[]) =>
+      list.map((l) => (l.id === lead.id ? lead : l))
+    setList((p) => ({ ...p, results: swap(p.results) }))
+    setSelLead((l) => (l?.id === lead.id ? lead : l))
+    setToday(swap)
+    setOverdue(swap)
+    setUpcoming(swap)
+  }
   const openLead = (id: number) => {
-    setSel(id)
+    setSelLead(
+      [...list.results, ...today, ...overdue, ...upcoming].find(
+        (l) => l.id === id
+      ) ?? null
+    )
     setSheet(true)
+    got(getApiLeadsDiscussions({ path: { id } }), (list) =>
+      setTalk((all) => ({ ...all, [id]: list }))
+    ).catch((error) => toast.error(describeApiError(error)))
   }
-  const openByName = (name: string) => {
-    const l = leads.find((x) => x.name === name)
-    if (l) openLead(l.id)
-  }
-  const toggleFu = (i: number) => {
-    const next = [...fu]
-    next[i] = !fu[i]
-    setFu(next)
-    if (next[i]) toast.success("Follow-up done.")
-  }
-  const saveLead = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name.trim()) return
-    const lead: Lead = {
-      id: Math.max(...leads.map((l) => l.id)) + 1,
-      name: form.name.trim(),
-      company: form.company.trim() || "—",
-      phone: form.phone.trim(),
-      status: "New",
-      last: "Just now",
-      value: Math.max(0, Math.round(Number(form.value) || 0)),
-      note: "",
-      next: "",
-      created: stamp(new Date()),
+  const toggleFu = async (lead: Lead) => {
+    const done = !lead.follow_up_done_at
+    try {
+      await got(
+        putApiLead({ path: { id: lead.id }, body: { follow_up_done: done } }),
+        merge
+      )
+      if (done) toast.success("Follow-up done.")
+      refresh()
+    } catch (error) {
+      toast.error(describeApiError(error))
     }
-    setLeads([lead, ...leads])
-    setForm({ name: "", company: "", phone: "", value: "" })
-    setAdd(false)
-    pickFilter("All")
-    toast.success("Lead saved.")
   }
-  const addNote = (e: React.FormEvent) => {
+  // Saves show only what the server confirmed; on failure the form keeps
+  // everything typed.
+  const saveLead = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!note.trim()) return
+    if (!form.name.trim() || saving) return
+    setSaving(true)
+    try {
+      await got(
+        postApiLeads({
+          body: {
+            name: form.name.trim(),
+            company: form.company.trim(),
+            phone: form.phone.trim(),
+            value: Math.max(0, Math.round(Number(form.value) || 0)),
+            source: form.source,
+          },
+        }),
+        () => {}
+      )
+      setForm({ name: "", company: "", phone: "", value: "", source: "" })
+      setAdd(false)
+      pickFilter("All")
+      toast.success("Lead saved.")
+      refresh()
+    } catch (error) {
+      toast.error(describeApiError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+  const addNote = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selLead || !note.trim() || saving) return
     // Keep everything typed when the follow-up is incomplete.
     if (fuOn && (!fuDate || !fuTime)) {
       toast.error("Pick both a date and a time for the follow-up.")
       return
     }
-    const follow = fuOn ? stamp(new Date(`${fuDate}T${fuTime}`)) : undefined
-    const entry: Note = { date: stamp(new Date()), note: note.trim(), follow }
-    setNotes({ ...notes, [selLead.id]: [entry, ...(notes[selLead.id] ?? [])] })
-    setLeads(
-      leads.map((l) =>
-        l.id === selLead.id
-          ? { ...l, last: "Just now", note: entry.note, next: follow ?? l.next }
-          : l
+    const id = selLead.id
+    setSaving(true)
+    try {
+      await got(
+        postApiLeadsDiscussions({
+          path: { id },
+          body: {
+            note: note.trim(),
+            follow_up_at: fuOn
+              ? new Date(`${fuDate}T${fuTime}`).toISOString()
+              : null,
+          },
+        }),
+        ({ discussion, lead }) => {
+          setTalk((all) => ({ ...all, [id]: [discussion, ...(all[id] ?? [])] }))
+          merge(lead)
+        }
       )
-    )
-    setNote("")
-    setFuOn(false)
-    setFuDate("")
-    setFuTime("")
-    toast.success(follow ? "Note and follow-up saved." : "Note added.")
+      setNote("")
+      setFuOn(false)
+      setFuDate("")
+      setFuTime("")
+      toast.success(fuOn ? "Note and follow-up saved." : "Note added.")
+      refresh()
+    } catch (error) {
+      toast.error(describeApiError(error))
+    } finally {
+      setSaving(false)
+    }
   }
-  const setStatus = (status: Status) => {
-    if (status === selLead.status) return
-    captureRows()
-    setLeads(leads.map((l) => (l.id === selLead.id ? { ...l, status } : l)))
-    toast.success(`Moved to ${status}.`)
+  const setStatus = async (status: Status) => {
+    if (!selLead || status === selLead.status || saving) return
+    setSaving(true)
+    try {
+      await got(
+        putApiLead({ path: { id: selLead.id }, body: { status } }),
+        (lead) => {
+          captureRows()
+          merge(lead)
+        }
+      )
+      toast.success(`Moved to ${status}.`)
+      refresh()
+    } catch (error) {
+      toast.error(describeApiError(error))
+    } finally {
+      setSaving(false)
+    }
   }
+  // Reports: fetch the period first, then roll the figures to it.
+  const pickPeriod = (p: Period) =>
+    load(3, p).then(() => {
+      if (!reduceMotion()) freezeRolls()
+      setPeriod(p)
+    })
 
   const readStrip = () => {
     const el = stripRef.current
@@ -951,11 +1116,13 @@ export default function Page() {
     </span>
   )
 
-  const max = Math.max(...Object.values(COUNTS))
-  const series = SERIES[period]
-  const bmax = Math.max(...series.bars.map((b) => b[1]))
-  const funnel = mode === "Count" ? COUNTS : FUNNEL_VAL
-  const fmax = Math.max(...Object.values(funnel))
+  const counts = dash?.by_status ?? ZERO_COUNTS
+  const max = Math.max(1, ...Object.values(counts))
+  const bmax = Math.max(1, ...rep.bars.map((b) => b.value))
+  const funnel = Object.fromEntries(
+    rep.funnel.map((f) => [f.status, mode === "Count" ? f.count : f.value])
+  ) as Record<Status, number>
+  const fmax = Math.max(1, ...Object.values(funnel))
 
   return (
     // Black bezel + a screen-sized rounded frame. The page never scrolls:
@@ -1054,20 +1221,32 @@ export default function Page() {
                       >
                         Pipeline
                         <span className="block text-muted-foreground">
-                          This quarter
+                          Open deals
                         </span>
                       </h1>
                       <div className="flex items-baseline gap-3">
-                        {bigNumber(money(PIPELINE))}
+                        {bigNumber(money(dash?.open_value ?? 0))}
                         <span className="text-[15px] font-medium text-muted-foreground">
                           open value
                         </span>
                       </div>
                     </div>
                     {callouts([
-                      { value: "21%", label: "Conversion rate" },
-                      { value: "2.4h", label: "Avg. first response" },
-                      { value: "68", label: "Active leads" },
+                      {
+                        value: pct(dash?.conversion_rate),
+                        label: "Conversion rate",
+                      },
+                      {
+                        value:
+                          dash?.avg_first_response_hours == null
+                            ? "—"
+                            : dash.avg_first_response_hours + "h",
+                        label: "Avg. first response",
+                      },
+                      {
+                        value: String(dash?.active_leads ?? 0),
+                        label: "Active leads",
+                      },
                     ])}
                   </div>
                   <div className="min-h-10 flex-1" />
@@ -1097,7 +1276,7 @@ export default function Page() {
                             )}
                             style={{
                               height:
-                                Math.max(22, (COUNTS[name] / max) * 100) + "%",
+                                Math.max(22, (counts[name] / max) * 100) + "%",
                             }}
                           >
                             <span
@@ -1106,7 +1285,7 @@ export default function Page() {
                                 on ? "text-background" : "text-foreground"
                               )}
                             >
-                              {COUNTS[name]}
+                              {counts[name]}
                             </span>
                           </div>
                           <span className="flex items-center gap-1.5 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap">
@@ -1139,34 +1318,47 @@ export default function Page() {
                   <div className="flex flex-col gap-3.5 rounded-[28px] bg-attention px-[22px] py-5 text-attention-foreground">
                     <div className="flex items-center justify-between">
                       <span className="text-[13px] font-medium">
-                        Overdue · {od + 1} of {OVERDUE.length}
+                        {odLead
+                          ? `Overdue · ${Math.min(od, overdue.length - 1) + 1} of ${overdue.length}`
+                          : "Overdue"}
                       </span>
                       <div className="flex gap-1.5">
                         <AttentionButton
                           title="Previous"
+                          disabled={overdue.length < 2}
                           onClick={() =>
-                            setOd((od + OVERDUE.length - 1) % OVERDUE.length)
+                            setOd((od + overdue.length - 1) % overdue.length)
                           }
                         >
                           <ArrowLeft {...sm} />
                         </AttentionButton>
                         <AttentionButton
                           title="Next"
-                          onClick={() => setOd((od + 1) % OVERDUE.length)}
+                          disabled={overdue.length < 2}
+                          onClick={() => setOd((od + 1) % overdue.length)}
                         >
                           <ArrowRight {...sm} />
                         </AttentionButton>
                       </div>
                     </div>
-                    <button
-                      onClick={() => openByName(OVERDUE[od].name)}
-                      className="cursor-pointer border-0 bg-transparent p-0 text-left text-[22px] leading-[1.2] font-light text-attention-foreground"
-                    >
-                      {OVERDUE[od].name}
-                      <span className="block text-sm leading-[1.4] font-normal text-attention-foreground/70">
-                        {OVERDUE[od].note}
+                    {odLead ? (
+                      <button
+                        onClick={() => openLead(odLead.id)}
+                        className="cursor-pointer border-0 bg-transparent p-0 text-left text-[22px] leading-[1.2] font-light text-attention-foreground"
+                      >
+                        {odLead.name}
+                        <span className="block text-sm leading-[1.4] font-normal text-attention-foreground/70">
+                          {overdueNote(odLead)}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="text-[22px] leading-[1.2] font-light">
+                        Nothing overdue
+                        <span className="block text-sm leading-[1.4] font-normal text-attention-foreground/70">
+                          Every follow-up is on time.
+                        </span>
                       </span>
-                    </button>
+                    )}
                   </div>
                 </Notch>
               </div>
@@ -1197,42 +1389,54 @@ export default function Page() {
                     </div>
                   </div>
                   <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
-                    {FU.map((f, i) => (
-                      <div
-                        key={f.name}
-                        className={cn(
-                          "flex items-center gap-3 rounded-[18px] bg-card py-3 pr-3 pl-3.5",
-                          fu[i] && "opacity-55"
-                        )}
-                      >
-                        <Avatar name={f.name} />
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span
-                            className={cn(
-                              "truncate text-sm font-medium",
-                              fu[i] && "line-through"
-                            )}
-                          >
-                            {f.name}
-                          </span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {f.time} · {f.task}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => toggleFu(i)}
-                          title={fu[i] ? "Mark as not done" : "Mark as done"}
+                    {today.length === 0 && (
+                      <span className="px-1 text-sm text-muted-foreground">
+                        No follow-ups today.
+                      </span>
+                    )}
+                    {today.map((l) => {
+                      const done = !!l.follow_up_done_at
+                      return (
+                        <div
+                          key={l.id}
                           className={cn(
-                            "grid size-9 flex-none cursor-pointer place-items-center rounded-full border-0 transition-colors duration-200",
-                            fu[i]
-                              ? "bg-foreground text-card"
-                              : "bg-secondary text-muted-foreground"
+                            "flex items-center gap-3 rounded-[18px] bg-card py-3 pr-3 pl-3.5",
+                            done && "opacity-55"
                           )}
                         >
-                          <Check {...sm} />
-                        </button>
-                      </div>
-                    ))}
+                          <Avatar name={l.name} />
+                          <button
+                            onClick={() => openLead(l.id)}
+                            className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 border-0 bg-transparent p-0 text-left text-foreground"
+                          >
+                            <span
+                              className={cn(
+                                "truncate text-sm font-medium",
+                                done && "line-through"
+                              )}
+                            >
+                              {l.name}
+                            </span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              {hhmm(l.next_follow_up_at)} ·{" "}
+                              {l.last_note?.note ?? "Follow up"}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => toggleFu(l)}
+                            title={done ? "Mark as not done" : "Mark as done"}
+                            className={cn(
+                              "grid size-9 flex-none cursor-pointer place-items-center rounded-full border-0 transition-colors duration-200",
+                              done
+                                ? "bg-foreground text-card"
+                                : "bg-secondary text-muted-foreground"
+                            )}
+                          >
+                            <Check {...sm} />
+                          </button>
+                        </div>
+                      )
+                    })}
                   </div>
                 </section>
 
@@ -1244,7 +1448,7 @@ export default function Page() {
                       subClass="opacity-70"
                     />
                     <span className="text-[13px] font-medium">
-                      {shown.length} shown
+                      {list.count} shown
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1265,7 +1469,7 @@ export default function Page() {
                           {dot && <Dot color={dot} />}
                           {name}
                           <span className="tabular-nums opacity-70">
-                            {countOf(name)}
+                            {countOf(name, leadStats?.by_status)}
                           </span>
                         </button>
                       )
@@ -1278,10 +1482,9 @@ export default function Page() {
                         Won this month
                       </span>
                       <span className="text-[40px] leading-none font-light tabular-nums">
-                        {money(42600)}
+                        {money(dash?.won_this_month ?? 0)}
                       </span>
                     </div>
-                    <span className="text-[13px] font-medium">5 deals</span>
                   </div>
                 </section>
               </div>
@@ -1302,7 +1505,7 @@ export default function Page() {
                     View all leads <ArrowRight {...sm} />
                   </button>
                 </Notch>
-                <LeadTable rows={shown.slice(0, 5)} onOpen={openLead} />
+                <LeadTable rows={list.results} onOpen={openLead} />
               </section>
             </>
           )}
@@ -1322,24 +1525,20 @@ export default function Page() {
                       <span className="text-[13px] font-medium text-muted-foreground">
                         Open value
                       </span>
-                      {bigNumber(money(open.reduce((a, l) => a + l.value, 0)))}
+                      {bigNumber(money(leadStats?.open_value ?? 0))}
                     </div>
                     {callouts(
                       [
-                        { value: String(open.length), label: "Open leads" },
                         {
-                          value: money(
-                            Math.round(
-                              leads.reduce((a, l) => a + l.value, 0) /
-                                Math.max(1, leads.length)
-                            )
-                          ),
+                          value: String(leadStats?.open_leads ?? 0),
+                          label: "Open leads",
+                        },
+                        {
+                          value: money(leadStats?.avg_value ?? 0),
                           label: "Avg. lead value",
                         },
                         {
-                          value: closed
-                            ? Math.round((countOf("Won") / closed) * 100) + "%"
-                            : "—",
+                          value: pct(leadStats?.win_rate),
                           label: "Win rate (closed)",
                         },
                       ],
@@ -1382,7 +1581,10 @@ export default function Page() {
                     })}
                   </div>
                 </Hero>
-                {railNotch("Leads", `${leads.length} total`)}
+                {railNotch(
+                  "Leads",
+                  `${countOf("All", leadStats?.by_status)} total`
+                )}
                 <Notch corner="tr" className="flex items-center gap-2">
                   {actions(addButton)}
                 </Notch>
@@ -1461,10 +1663,7 @@ export default function Page() {
                     </div>
                   </div>
                 </Notch>
-                <LeadTable
-                  rows={shown.slice(page * 10, page * 10 + 10)}
-                  onOpen={openLead}
-                />
+                <LeadTable rows={list.results} onOpen={openLead} />
               </section>
             </div>
           )}
@@ -1494,20 +1693,24 @@ export default function Page() {
                     onScroll={readStrip}
                     className="flex snap-x snap-mandatory [scrollbar-width:none] gap-2 overflow-x-auto overscroll-x-contain [&::-webkit-scrollbar]:hidden"
                   >
-                    {FU.length === 0 && (
+                    {today.length === 0 && (
                       <div className="flex h-[150px] w-full items-center rounded-[20px] bg-card px-5 text-sm text-muted-foreground">
                         No follow-ups today.
                       </div>
                     )}
-                    {FU.map((f, i) => (
+                    {today.map((l) => (
                       <button
-                        key={f.name}
-                        data-fu-done={fu[i] || undefined}
-                        onClick={() => toggleFu(i)}
-                        title={fu[i] ? "Mark as not done" : "Mark as done"}
+                        key={l.id}
+                        data-fu-done={l.follow_up_done_at ? true : undefined}
+                        onClick={() => toggleFu(l)}
+                        title={
+                          l.follow_up_done_at
+                            ? "Mark as not done"
+                            : "Mark as done"
+                        }
                         className={cn(
                           "box-border flex h-[150px] min-w-0 flex-none cursor-pointer snap-start flex-col justify-between gap-[22px] rounded-[20px] border-0 p-4 text-left transition-colors duration-200",
-                          fu[i]
+                          l.follow_up_done_at
                             ? "bg-foreground text-background"
                             : "bg-card text-foreground"
                         )}
@@ -1520,12 +1723,12 @@ export default function Page() {
                       >
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-[28px] leading-none font-light tabular-nums">
-                            {f.time}
+                            {hhmm(l.next_follow_up_at)}
                           </span>
                           <span
                             className={cn(
                               "grid size-[30px] flex-none place-items-center rounded-full",
-                              fu[i]
+                              l.follow_up_done_at
                                 ? "bg-background text-foreground"
                                 : "bg-secondary text-muted-foreground"
                             )}
@@ -1535,10 +1738,10 @@ export default function Page() {
                         </span>
                         <span className="flex min-w-0 flex-col gap-0.5">
                           <span className="truncate text-sm font-medium">
-                            {f.name}
+                            {l.name}
                           </span>
                           <span className="truncate text-xs opacity-70">
-                            {f.task}
+                            {l.last_note?.note ?? "Follow up"}
                           </span>
                         </span>
                       </button>
@@ -1559,7 +1762,7 @@ export default function Page() {
                       </span>
                     </span>
                     <span className="text-[40px] leading-none font-light tabular-nums">
-                      {FU.length - fuLeft}/{FU.length}
+                      {today.length - fuLeft}/{today.length}
                     </span>
                   </div>
                 </Notch>
@@ -1582,15 +1785,20 @@ export default function Page() {
               >
                 <section className="flex min-h-0 min-w-0 flex-col gap-[18px] overflow-y-auto rounded-xl bg-background p-6">
                   <Title title="Upcoming" sub="Next 7 days" />
-                  {UPCOMING.map((g) => (
-                    <div key={g.day} className="flex flex-col gap-1.5">
+                  {upcoming.length === 0 && (
+                    <span className="px-1 text-sm text-muted-foreground">
+                      Nothing scheduled for the next 7 days.
+                    </span>
+                  )}
+                  {byDay(upcoming).map(([day, items]) => (
+                    <div key={day} className="flex flex-col gap-1.5">
                       <span className="px-1 text-xs font-medium text-muted-foreground">
-                        {g.day}
+                        {day}
                       </span>
-                      {g.items.map((u) => (
+                      {items.map((u) => (
                         <button
-                          key={u.name}
-                          onClick={() => openByName(u.name)}
+                          key={u.id}
+                          onClick={() => openLead(u.id)}
                           className="flex cursor-pointer items-center gap-3 rounded-[18px] border-0 bg-card py-3 pr-4 pl-3.5 text-left text-foreground hover:bg-secondary"
                         >
                           <Avatar name={u.name} />
@@ -1599,11 +1807,11 @@ export default function Page() {
                               {u.name}
                             </span>
                             <span className="truncate text-xs text-muted-foreground">
-                              {u.task}
+                              {u.last_note?.note ?? u.company}
                             </span>
                           </span>
                           <span className="text-[15px] font-light tabular-nums">
-                            {u.time}
+                            {hhmm(u.next_follow_up_at)}
                           </span>
                         </button>
                       ))}
@@ -1618,17 +1826,22 @@ export default function Page() {
                       subClass="opacity-70"
                     />
                     <span className="text-[44px] leading-none font-light tabular-nums">
-                      {OVERDUE.length}
+                      {overdue.length}
                     </span>
                   </div>
-                  {OVERDUE.map((o) => (
+                  {overdue.length === 0 && (
+                    <span className="text-sm opacity-70">Nothing overdue.</span>
+                  )}
+                  {overdue.map((o) => (
                     <button
-                      key={o.name}
-                      onClick={() => openByName(o.name)}
+                      key={o.id}
+                      onClick={() => openLead(o.id)}
                       className="flex cursor-pointer flex-col gap-0.5 border-0 border-t border-attention-foreground/20 bg-transparent px-0 pt-3.5 pb-0 text-left text-attention-foreground"
                     >
                       <span className="text-lg font-light">{o.name}</span>
-                      <span className="text-sm opacity-70">{o.note}</span>
+                      <span className="text-sm opacity-70">
+                        {overdueNote(o)}
+                      </span>
                     </button>
                   ))}
                 </section>
@@ -1672,20 +1885,23 @@ export default function Page() {
                         >
                           Revenue won
                           <span className="block text-muted-foreground">
-                            {series.label}
+                            {PERIOD_LABEL[period]}
                           </span>
                         </h1>
-                        {bigNumber(money(series.total))}
+                        {bigNumber(money(rep.revenue))}
                       </div>
                       {callouts(
                         [
-                          { value: String(series.deals), label: "Deals won" },
+                          { value: String(rep.deals_won), label: "Deals won" },
                           {
-                            value: money(series.size),
+                            value: money(rep.avg_deal),
                             label: "Avg. deal size",
                           },
                           {
-                            value: series.days + " days",
+                            value:
+                              rep.avg_days_to_close === null
+                                ? "—"
+                                : Math.round(rep.avg_days_to_close) + " days",
                             label: "Avg. time to close",
                           },
                         ],
@@ -1701,8 +1917,8 @@ export default function Page() {
                         paddingBottom: narrow ? 150 : 0,
                       }}
                     >
-                      {series.bars.map(([label, v], i) => {
-                        const last = i === series.bars.length - 1
+                      {rep.bars.map(({ label, value: v }, i) => {
+                        const last = i === rep.bars.length - 1
                         return (
                           <div
                             key={label}
@@ -1741,12 +1957,9 @@ export default function Page() {
                     data-flip-id="periods"
                     className="h-16 p-1.5"
                     itemClass={cn("h-13", cw < 1014 ? "px-3" : "px-[18px]")}
-                    options={Object.keys(SERIES) as (keyof typeof SERIES)[]}
+                    options={PERIODS}
                     value={period}
-                    onChange={(p) => {
-                      if (!reduceMotion()) freezeRolls()
-                      setPeriod(p)
-                    }}
+                    onChange={pickPeriod}
                   />
                   {actions(
                     <Button
@@ -1768,14 +1981,14 @@ export default function Page() {
                         data-roll="win-note"
                         className="text-sm text-attention-foreground/70"
                       >
-                        {series.winNote}
+                        {winNote}
                       </span>
                     </div>
                     <span
                       data-roll="win"
                       className="text-5xl leading-none font-light tabular-nums"
                     >
-                      {series.win}
+                      {pct(rep.win_rate)}
                     </span>
                   </div>
                 </Notch>
@@ -1829,7 +2042,7 @@ export default function Page() {
                 <div className="flex items-start justify-between gap-3">
                   <Title
                     title="Lead sources"
-                    sub={series.label}
+                    sub={PERIOD_LABEL[period]}
                     subClass="opacity-70"
                     subRoll="src-sub"
                   />
@@ -1837,32 +2050,40 @@ export default function Page() {
                     data-roll="src-leads"
                     className="text-[13px] font-medium"
                   >
-                    {series.leads} leads
+                    {rep.leads} leads
                   </span>
                 </div>
                 {/* Part-to-whole: one bar split by share, largest first, in
                     steps of the ink (2px surface gaps between segments). */}
                 <div className="flex h-14 flex-none gap-0.5 overflow-hidden rounded-[18px]">
-                  {SOURCES.map(([name, p], i) => (
+                  {rep.sources.length === 0 && (
+                    <span className="flex-1 rounded-[4px] bg-brand-ink/20" />
+                  )}
+                  {rep.sources.map(({ source, share: p }, i) => (
                     <span
-                      key={name}
-                      title={`${name}: ${p}%`}
+                      key={source}
+                      title={`${source || "Not recorded"}: ${p}%`}
                       className="rounded-[4px] bg-brand-ink"
-                      style={{ flexGrow: p, opacity: SOURCE_INK[i] }}
+                      style={{ flexGrow: p, opacity: ink(i) }}
                     />
                   ))}
                 </div>
                 <div className="flex flex-col gap-2.5">
-                  {SOURCES.map(([name, p], i) => (
+                  {rep.sources.length === 0 && (
+                    <span className="text-sm opacity-70">
+                      No leads came in this {period.toLowerCase()}.
+                    </span>
+                  )}
+                  {rep.sources.map(({ source, share: p }, i) => (
                     <div
-                      key={name}
+                      key={source}
                       className="flex items-center gap-2.5 text-sm font-medium"
                     >
                       <span
                         className="size-2.5 flex-none rounded-full bg-brand-ink"
-                        style={{ opacity: SOURCE_INK[i] }}
+                        style={{ opacity: ink(i) }}
                       />
-                      <span className="flex-1">{name}</span>
+                      <span className="flex-1">{source || "Not recorded"}</span>
                       <span className="tabular-nums">{p}%</span>
                     </div>
                   ))}
@@ -1879,9 +2100,9 @@ export default function Page() {
           <NotchedSurface />
           <CloseButton onClick={() => setSheet(false)} />
           <SheetHeader>
-            <SheetTitle>{selLead.name}</SheetTitle>
+            <SheetTitle>{selLead?.name}</SheetTitle>
             <SheetDescription>
-              {[selLead.company, selLead.phone, money(selLead.value)]
+              {[selLead?.company, selLead?.phone, money(selLead?.value ?? 0)]
                 .filter(Boolean)
                 .join(" · ")}
             </SheetDescription>
@@ -1892,7 +2113,7 @@ export default function Page() {
             className="flex flex-wrap gap-1.5 px-4 pb-2"
           >
             {STAGES.map(([name, dot]) => {
-              const on = selLead.status === name
+              const on = selLead?.status === name
               return (
                 <button
                   key={name}
@@ -1980,7 +2201,7 @@ export default function Page() {
                   onChange={(e) => setFuTime(e.target.value)}
                 />
               </div>
-              <Button type="submit" disabled={!note.trim()}>
+              <Button type="submit" disabled={!note.trim() || saving}>
                 Save note
               </Button>
             </form>
@@ -2026,9 +2247,25 @@ export default function Page() {
                   />
                 </div>
               ))}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="lead-source">Source</Label>
+                <select
+                  id="lead-source"
+                  value={form.source}
+                  onChange={(e) =>
+                    setForm({ ...form, source: e.target.value as SourceEnum })
+                  }
+                  className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                >
+                  <option value="">Not recorded</option>
+                  {SOURCE_OPTIONS.map((o) => (
+                    <option key={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <DialogFooter showCloseButton>
-              <Button type="submit" disabled={!form.name.trim()}>
+              <Button type="submit" disabled={!form.name.trim() || saving}>
                 Save lead
               </Button>
             </DialogFooter>
@@ -2270,7 +2507,9 @@ function LeadTable({
           >
             <span className="flex min-w-0 flex-col gap-px">
               <span className="truncate text-sm font-medium">{l.name}</span>
-              <span className="text-xs text-muted-foreground">{l.company}</span>
+              <span className="text-xs text-muted-foreground">
+                {l.company || "—"}
+              </span>
             </span>
             <span className="flex min-w-0 flex-col items-start gap-1">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-[3px] text-xs font-medium">
@@ -2286,12 +2525,14 @@ function LeadTable({
             </span>
             <span className="flex min-w-0 flex-col gap-px">
               <span className="truncate text-[13px]">
-                {l.note || "No notes yet"}
+                {l.last_note?.note ?? "No notes yet"}
               </span>
-              <span className="text-xs text-muted-foreground">{l.last}</span>
+              <span className="text-xs text-muted-foreground">
+                {ago(lastAt(l))}
+              </span>
             </span>
             <span className="text-right text-[15px] font-light tabular-nums">
-              {money(l.value)}
+              {money(l.value ?? 0)}
             </span>
           </button>
         ))}
@@ -2305,10 +2546,13 @@ function LeadTable({
   )
 }
 
-/** Next follow-up: one set from a note, else today's scheduled one. */
+/** The lead's next follow-up, if one is open: "Today, 15:15" or a date. */
 const nextOf = (l: Lead) => {
-  const f = FU.find((x) => x.name === l.name)
-  return l.next || (f ? "Today, " + f.time : "")
+  if (!l.next_follow_up_at || l.follow_up_done_at) return ""
+  const d = new Date(l.next_follow_up_at)
+  return d.toDateString() === new Date().toDateString()
+    ? "Today, " + hhmm(l.next_follow_up_at)
+    : stamp(d)
 }
 
 /** The popup's surface with its top-right corner cut out for the close button. */
@@ -2354,23 +2598,70 @@ const inr = new Intl.NumberFormat("en-IN", {
 })
 const money = (v: number) => inr.format(v)
 /** "15 Oct, 2:00 pm" */
-const stamp = (d: Date) =>
-  d.toLocaleString("en-IN", {
+const stamp = (d: Date | string) =>
+  new Date(d).toLocaleString("en-IN", {
     day: "numeric",
     month: "short",
     hour: "numeric",
     minute: "2-digit",
   })
-/** Sort key for "last touch" labels, newest first: Just now, Today hh:mm,
- *  Yesterday, "n days ago", then dated ones ("12 Oct"). */
-const agoRank = (s: string) => {
-  if (s === "Just now") return 0
-  const t = /^Today, (\d+):(\d+)/.exec(s)
-  if (t) return 1 - (+t[1] * 60 + +t[2]) / 1440
-  if (s === "Yesterday") return 2
-  const n = /^(\d+) days ago/.exec(s)
-  if (n) return 1 + +n[1]
-  return 100 - (parseInt(s) || 0)
+/** "15:15" in local time. */
+const hhmm = (iso?: string | null) =>
+  iso
+    ? new Date(iso).toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : ""
+/** When the lead was last touched: its newest note, else its creation. */
+const lastAt = (l: Lead) => l.last_note?.created_at ?? l.created_at
+/** "Just now", "5 min ago", "2 hours ago", "Yesterday", "3 days ago", "12 Oct". */
+const ago = (iso: string) => {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins} min ago`
+  if (mins < 24 * 60) {
+    const h = Math.round(mins / 60)
+    return `${h} hour${h === 1 ? "" : "s"} ago`
+  }
+  const days = Math.round(mins / 1440)
+  if (days === 1) return "Yesterday"
+  if (days < 7) return `${days} days ago`
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  })
+}
+const pct = (v?: number | null) => (v == null ? "—" : v + "%")
+const points = (n: number) => `${n} point${n === 1 ? "" : "s"}`
+/** "Kite Labs · was due 2 days ago" */
+const overdueNote = (l: Lead) =>
+  [l.company, "was due " + ago(l.next_follow_up_at ?? l.created_at)]
+    .filter(Boolean)
+    .join(" · ")
+/** Upcoming follow-ups grouped by day: [["Thu, 16 Oct", leads], …]. */
+const byDay = (list: Lead[]) => {
+  const groups = new Map<string, Lead[]>()
+  for (const l of list) {
+    const day = new Date(
+      l.next_follow_up_at ?? l.created_at
+    ).toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })
+    groups.set(day, [...(groups.get(day) ?? []), l])
+  }
+  return [...groups]
+}
+/** Unwrap an SDK result: hand the data to `apply`, or throw the API error. */
+async function got<T>(
+  call: Promise<{ data?: T; error?: unknown }>,
+  apply: (data: T) => void
+) {
+  const { data, error } = await call
+  if (error !== undefined || data === undefined) throw error ?? new Error()
+  apply(data)
 }
 // Short bar labels: ₹42.6k, ₹1.2L.
 const kfmt = (v: number) =>
@@ -2465,187 +2756,45 @@ const NAV = [
   ["Reports", ChartColumn],
 ] as const
 
-const PIPELINE = 184200
-const COUNTS: Record<Status, number> = {
-  New: 24,
-  Contacted: 18,
-  Qualified: 11,
-  "Proposal Sent": 7,
-  Won: 5,
-  Lost: 3,
+const SORT_KEY = { Recent: "recent", Value: "value", Name: "name" } as const
+const EMPTY_PAGE: PaginatedLead = {
+  count: 0,
+  next: null,
+  previous: null,
+  results: [],
 }
-const FUNNEL_VAL: Record<Status, number> = {
-  New: 62400,
-  Contacted: 48100,
-  Qualified: 39800,
-  "Proposal Sent": 34000,
-  Won: 42600,
-  Lost: 12300,
-}
-// Sample latest note per status (illustrative).
-const SEED_NOTE: Record<Status, string> = {
-  New: "Came in through the website form.",
-  Contacted: "Left a voicemail, will try again.",
-  Qualified: "Budget confirmed, wants a demo.",
-  "Proposal Sent": "Proposal sent, waiting on sign-off.",
-  Won: "Signed the annual plan.",
-  Lost: "Went with a cheaper vendor.",
-}
-const LEADS: Lead[] = (
-  [
-    ["Priya Sharma", "Acme Corp", "Qualified", "Today, 10:20", 18400],
-    ["Rohan Mehta", "Kite Labs", "Proposal Sent", "2 days ago", 32000],
-    ["Elena Ruiz", "Northwind", "New", "Today, 09:05", 6500],
-    ["Daniel Okafor", "Bluefin Studio", "Contacted", "Yesterday", 12200],
-    ["Mei Tanaka", "Sora Health", "Won", "12 Oct", 24800],
-    ["Arjun Nair", "Granite & Co", "Proposal Sent", "3 days ago", 41500],
-    ["Sofia Bianchi", "Lumen Retail", "Lost", "8 Oct", 9000],
-    ["Kabir Khan", "Fieldstone", "New", "Today, 11:40", 4800],
-    ["Liam Carter", "Harbor Freight Co", "Contacted", "Yesterday", 7600],
-    ["Ananya Iyer", "Pixel Forge", "Qualified", "2 days ago", 15300],
-    ["Noah Fischer", "Brightline", "New", "Today, 08:15", 5200],
-    ["Zara Ahmed", "Cedar Finance", "Proposal Sent", "4 days ago", 28700],
-    ["Lucas Moreau", "Atelier Nord", "Won", "9 Oct", 19900],
-    ["Isha Reddy", "Monsoon Foods", "Contacted", "3 days ago", 8400],
-    ["Ethan Brooks", "Quarry Labs", "Qualified", "Yesterday", 21000],
-    ["Hana Kim", "Seoul Supply", "New", "Today, 12:10", 3900],
-    ["Omar Haddad", "Dune Logistics", "Lost", "6 Oct", 11200],
-    ["Chloe Martin", "Petal & Stem", "Contacted", "Today, 09:50", 6100],
-    ["Vikram Singh", "Ironleaf", "Proposal Sent", "5 days ago", 36400],
-    ["Grace Lee", "Tidewater", "Qualified", "2 days ago", 13800],
-    ["Mateo Garcia", "Sol Energy", "New", "Yesterday", 7200],
-    ["Aisha Bello", "Lagos Digital", "Contacted", "4 days ago", 9800],
-    ["Ravi Patel", "Orbit Systems", "Won", "11 Oct", 27500],
-    ["Emma Novak", "Vista Travel", "Qualified", "Today, 10:45", 16600],
-    ["Jonas Berg", "Fjord Design", "New", "3 days ago", 4400],
-    ["Leila Haddad", "Olive Tree Co", "Lost", "7 Oct", 8100],
-  ] as const
-).map(([name, company, status, last, value], id) => ({
-  id,
-  name,
-  company,
-  phone: "",
-  status,
-  last,
-  value,
-  note: SEED_NOTE[status],
-  next: "",
-  created: "1 Oct 2026",
-}))
-const FU = [
-  {
-    name: "Priya Sharma",
-    time: "11:30",
-    task: "Send revised quote",
-    done: true,
-  },
-  { name: "Hana Kim", time: "12:15", task: "Confirm budget", done: false },
-  { name: "Elena Ruiz", time: "13:00", task: "Intro call", done: false },
-  {
-    name: "Daniel Okafor",
-    time: "15:15",
-    task: "Share case study",
-    done: false,
-  },
-  {
-    name: "Ethan Brooks",
-    time: "16:00",
-    task: "Review contract terms",
-    done: false,
-  },
-  { name: "Kabir Khan", time: "17:00", task: "Book a demo", done: false },
-  { name: "Grace Lee", time: "18:00", task: "Check in on trial", done: false },
-]
-const OVERDUE = [
-  {
-    name: "Rohan Mehta",
-    note: "Kite Labs · Proposal follow-up was due 2 days ago",
-  },
-  { name: "Arjun Nair", note: "Granite & Co · Pricing call was due yesterday" },
-]
-const UPCOMING = [
-  {
-    day: "Thu, 16 Oct",
-    items: [
-      { name: "Ananya Iyer", task: "Send proposal draft", time: "10:00" },
-      { name: "Zara Ahmed", task: "Pricing review", time: "14:30" },
-    ],
-  },
-  {
-    day: "Fri, 17 Oct",
-    items: [{ name: "Liam Carter", task: "Second call", time: "11:00" }],
-  },
-  {
-    day: "Mon, 20 Oct",
-    items: [
-      { name: "Vikram Singh", task: "Contract walkthrough", time: "16:00" },
-    ],
-  },
-]
-const SERIES = {
-  Week: {
-    label: "This week",
-    total: 9800,
-    bars: [
-      ["Mon", 1200],
-      ["Tue", 2600],
-      ["Wed", 3100],
-      ["Thu", 0],
-      ["Fri", 2900],
-      ["Sat", 0],
-      ["Sun", 0],
-    ],
-    deals: 2,
-    size: 4900,
-    days: 16,
-    win: "24%",
-    winNote: "Up 3 points on last week",
-    leads: 14,
-  },
-  Month: {
-    label: "This month",
-    total: 42600,
-    bars: [
-      ["May", 28400],
-      ["Jun", 33100],
-      ["Jul", 25900],
-      ["Aug", 38200],
-      ["Sep", 36700],
-      ["Oct", 42600],
-    ],
-    deals: 5,
-    size: 8520,
-    days: 18,
-    win: "21%",
-    winNote: "Up 3 points on September",
-    leads: 68,
-  },
-  Quarter: {
-    label: "This quarter",
-    total: 118300,
-    bars: [
-      ["Q1", 86400],
-      ["Q2", 94200],
-      ["Q3", 100800],
-      ["Q4", 118300],
-    ],
-    deals: 14,
-    size: 8450,
-    days: 21,
-    win: "19%",
-    winNote: "Up 1 point on Q3",
-    leads: 182,
-  },
-} satisfies Record<
-  string,
-  { bars: [string, number][] } & Record<string, unknown>
+const PERIODS = ["Week", "Month", "Quarter"] as const
+const PERIOD_KEY = { Week: "week", Month: "month", Quarter: "quarter" } as const
+const PERIOD_LABEL = {
+  Week: "This week",
+  Month: "This month",
+  Quarter: "This quarter",
+} as const
+const ZERO_COUNTS = Object.fromEntries(STAGES.map(([s]) => [s, 0])) as Record<
+  Status,
+  number
 >
-// Segment opacity per source rank (SOURCES is sorted largest first).
-const SOURCE_INK = [1, 0.78, 0.58, 0.42, 0.28]
-const SOURCES = [
-  ["Website form", 34],
-  ["Referral", 22],
-  ["LinkedIn", 18],
-  ["Cold email", 14],
-  ["Events", 12],
-] as const
+// Shown until a period's report arrives.
+const EMPTY_REPORT: ReportsStats = {
+  period: "month",
+  revenue: 0,
+  deals_won: 0,
+  avg_deal: 0,
+  avg_days_to_close: null,
+  win_rate: null,
+  prev_win_rate: null,
+  bars: [],
+  funnel: STAGES.map(([status]) => ({ status, count: 0, value: 0 })),
+  leads: 0,
+  sources: [],
+}
+const SOURCE_OPTIONS: SourceEnum[] = [
+  "Website form",
+  "Referral",
+  "LinkedIn",
+  "Cold email",
+  "Events",
+  "Other",
+]
+// Segment opacity by source rank (the API sorts sources largest first).
+const ink = (rank: number) => [1, 0.78, 0.58, 0.42, 0.28][rank] ?? 0.2
