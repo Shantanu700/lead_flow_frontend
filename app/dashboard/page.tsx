@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,12 +12,12 @@ import {
   Download,
   House,
   Inbox,
+  LogOut,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Search,
-  Settings,
   Sun,
   Users,
   X,
@@ -26,6 +27,7 @@ import gsap from "gsap"
 import { Flip } from "gsap/Flip"
 import { toast } from "sonner"
 
+import { refreshCsrf } from "@/lib/api"
 import { NOTCH_R, Notch } from "@/components/notch"
 import { useSession } from "@/components/session"
 import { useThemeToggle } from "@/components/theme-provider"
@@ -48,6 +50,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { deleteCoreLogin } from "@/src/client/sdk.gen"
 import { cn } from "@/lib/utils"
 
 // ponytail: sample data until /api/leads/ exists; swap state seeds for SDK calls.
@@ -61,8 +64,15 @@ type Lead = {
   status: Status
   last: string
   value: number
+  /** Latest discussion note, previewed in the list. */
+  note: string
+  /** Next follow-up set from a note ("" when none). */
+  next: string
+  created: string
 }
-type Note = { date: string; note: string }
+/** A timeline entry. System events (lead created) aren't discussions. */
+type Note = { date: string; note: string; follow?: string; system?: boolean }
+type Sort = "Recent" | "Value" | "Name"
 
 gsap.registerPlugin(useGSAP, Flip)
 
@@ -77,6 +87,18 @@ const LEAD_COLS = "minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) 110px"
 
 export default function Page() {
   const user = useSession()
+  const router = useRouter()
+
+  async function logOut() {
+    const { error } = await deleteCoreLogin().catch(() => ({
+      error: true as const,
+    }))
+    refreshCsrf()
+    if (error)
+      toast.warning("We could not reach the server to end your session.")
+    else toast.success("Signed out.")
+    router.replace("/auth")
+  }
   const toggleTheme = useThemeToggle()
   const frameRef = React.useRef<HTMLDivElement>(null)
   const contentRef = React.useRef<HTMLDivElement>(null)
@@ -104,8 +126,17 @@ export default function Page() {
     value: "",
   })
   const [note, setNote] = React.useState("")
+  const [fuOn, setFuOn] = React.useState(false)
+  const [fuDate, setFuDate] = React.useState("")
+  const [fuTime, setFuTime] = React.useState("")
+  const [sort, setSort] = React.useState<Sort>("Recent")
   const [leads, setLeads] = React.useState(LEADS)
-  const [notes, setNotes] = React.useState<Record<number, Note[]>>({})
+  // Each lead's discussions, newest first; seeded with its latest note.
+  const [notes, setNotes] = React.useState<Record<number, Note[]>>(() =>
+    Object.fromEntries(
+      LEADS.map((l) => [l.id, [{ date: l.last, note: l.note }]])
+    )
+  )
   const [period, setPeriod] = React.useState<keyof typeof SERIES>("Month")
   const [mode, setMode] = React.useState<"Count" | "Value">("Count")
 
@@ -119,7 +150,11 @@ export default function Page() {
   //    slide toward their nearest edge, hero/notch details fade.
   // Out (0.25s) runs before React swaps the view; In runs after.
   const flipState = React.useRef<Flip.FlipState | null>(null)
+  // Lead rows before a list change (see captureRows).
+  const rowsState = React.useRef<Flip.FlipState | null>(null)
   const prevIds = React.useRef<Set<string>>(new Set())
+  // View the entrance effect last ran for.
+  const shownView = React.useRef(view)
   // Corner the bottom notch sat in before the switch.
   const attFrom = React.useRef<string | undefined>(undefined)
   const ghosts = React.useRef<Map<string, { node: HTMLElement; text: string }>>(
@@ -218,7 +253,9 @@ export default function Page() {
           pointerEvents: "none",
           zIndex: "40",
           overflow: "hidden", // the mask the old text rolls out of
-          whiteSpace: "nowrap",
+          // One-line text must not wrap in its copy; wrapped text keeps wrapping.
+          whiteSpace:
+            r.height > parseFloat(cs.lineHeight) * 1.5 ? "normal" : "nowrap",
           color: cs.color,
           fontFamily: cs.fontFamily,
           fontSize: cs.fontSize,
@@ -242,6 +279,52 @@ export default function Page() {
   const reduceMotion = () =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
+  /** After freezeRolls() and a re-render: unchanged text needs nothing;
+   *  changed or new text rises in while the old copy rises out. Call inside
+   *  a GSAP context. */
+  const rollTexts = () => {
+    const dropGhost = (key: string) => {
+      const g = ghosts.current.get(key)
+      if (!g) return
+      ghosts.current.delete(key)
+      gsap.to(g.node.firstElementChild, {
+        yPercent: -100,
+        duration: 0.45,
+        ease: "power3.inOut",
+        onComplete: () => g.node.remove(),
+      })
+    }
+    contentRef.current
+      ?.querySelectorAll<HTMLElement>("[data-roll]")
+      .forEach((el) => {
+        el.style.opacity = "" // hidden by freezeRolls if the node survived
+        const key = el.dataset.roll!
+        const g = ghosts.current.get(key)
+        if (g && g.text === el.textContent) {
+          ghosts.current.delete(key)
+          g.node.remove()
+          return
+        }
+        dropGhost(key)
+        // Rise from below, clipped to its own box: shifting down by (1-p)
+        // while revealing the top p of it keeps the visible part inside the
+        // final box, like text rolling up behind a mask.
+        gsap.fromTo(
+          el,
+          { yPercent: 100, clipPath: "inset(0% 0% 100% 0%)" },
+          {
+            yPercent: 0,
+            clipPath: "inset(0% 0% 0% 0%)",
+            duration: 0.45,
+            ease: "power3.inOut",
+            clearProps: "transform,clipPath",
+          }
+        )
+      })
+    // Text with no counterpart in the new state just rolls out.
+    ;[...ghosts.current.keys()].forEach(dropGhost)
+  }
+
   // Ids each view renders, so the exit knows what will survive the swap.
   // Lead rows are added from the data (see rowIds).
   const rowIds = (v: number) =>
@@ -256,6 +339,12 @@ export default function Page() {
     () => {
       const grid = contentRef.current
       if (!grid) return
+      // Dashboard <-> Inbox share a layout: nothing enters, nothing to play.
+      const layout = (v: number) => (v === 4 ? 0 : v)
+      const swapOnly =
+        shownView.current !== view && layout(shownView.current) === layout(view)
+      shownView.current = view
+      if (swapOnly) return
       const shapeEls = shape()
       const bars = grid.querySelectorAll("[data-bar]")
       const from = flipState.current
@@ -293,18 +382,6 @@ export default function Page() {
             }
           )
         })
-      const dropGhost = (key: string) => {
-        const g = ghosts.current.get(key)
-        if (!g) return
-        ghosts.current.delete(key)
-        gsap.to(g.node.firstElementChild, {
-          yPercent: -100,
-          duration: 0.45,
-          ease: "power3.inOut",
-          onComplete: () => g.node.remove(),
-        })
-      }
-
       if (reduceMotion()) {
         fadeIn(panels(), { duration: 0.3, ease: "none" })
         return
@@ -393,34 +470,7 @@ export default function Page() {
           { duration: 0.35, delay: 0.3, ease: "power2.out" }
         )
         slideIn(newPanels, 0.15)
-        // Roll text: unchanged text needs nothing (its container morphs);
-        // changed or new text rises in while the old copy rises out.
-        grid.querySelectorAll<HTMLElement>("[data-roll]").forEach((el) => {
-          const key = el.dataset.roll!
-          const g = ghosts.current.get(key)
-          if (g && g.text === el.textContent) {
-            ghosts.current.delete(key)
-            g.node.remove()
-            return
-          }
-          dropGhost(key)
-          // Rise from below, clipped to its own box: shifting down by (1-p)
-          // while revealing the top p of it keeps the visible part inside the
-          // final box, like text rolling up behind a mask.
-          gsap.fromTo(
-            el,
-            { yPercent: 100, clipPath: "inset(0% 0% 100% 0%)" },
-            {
-              yPercent: 0,
-              clipPath: "inset(0% 0% 0% 0%)",
-              duration: 0.45,
-              ease: "power3.inOut",
-              clearProps: "transform,clipPath",
-            }
-          )
-        })
-        // Text with no counterpart in the new view just rolls out.
-        ;[...ghosts.current.keys()].forEach(dropGhost)
+        rollTexts()
       }
       if (bars.length)
         gsap.fromTo(
@@ -490,6 +540,54 @@ export default function Page() {
         )
       )
     })()
+
+  // Period change (Reports): changed figures roll like a view change and the
+  // new bars grow from the baseline. The first run is the view's own entrance.
+  const periodShown = React.useRef(period)
+  useGSAP(
+    () => {
+      if (periodShown.current === period) return
+      periodShown.current = period
+      rollTexts()
+      const bars = contentRef.current?.querySelectorAll("[data-bar]")
+      if (!bars?.length || reduceMotion()) return
+      gsap.fromTo(
+        bars,
+        { clipPath: "inset(100% 0 0 0)" },
+        {
+          clipPath: "inset(0% 0 0 0)",
+          duration: 0.5,
+          stagger: 0.03,
+          delay: 0.1,
+          ease: "power3.out",
+          clearProps: "clipPath",
+        }
+      )
+    },
+    { scope: contentRef, dependencies: [period] }
+  )
+
+  useGSAP(
+    () => {
+      const from = rowsState.current
+      rowsState.current = null
+      if (!from) return
+      Flip.from(from, {
+        targets: contentRef.current?.querySelectorAll(
+          '[data-flip-id^="lead-"]'
+        ),
+        duration: 0.3,
+        ease: "power3.inOut",
+        onEnter: (els) =>
+          gsap.fromTo(
+            els,
+            { opacity: 0 },
+            { opacity: 1, duration: 0.2, delay: 0.1, clearProps: "opacity" }
+          ),
+      })
+    },
+    { scope: contentRef, dependencies: [sort, filter, q, leads] }
+  )
 
   // Rail highlight: one pill slides to the active row instead of each row
   // swapping its own background. Placed without motion on first render.
@@ -574,15 +672,28 @@ export default function Page() {
     month: "short",
   })
 
-  const shown = leads.filter(
-    (l) =>
-      (filter === "All" || l.status === filter) &&
-      (l.name + l.company).toLowerCase().includes(q.toLowerCase())
-  )
+  const shown = leads
+    .filter(
+      (l) =>
+        (filter === "All" || l.status === filter) &&
+        (l.name + l.company + l.note).toLowerCase().includes(q.toLowerCase())
+    )
+    .sort((a, b) =>
+      sort === "Value"
+        ? b.value - a.value
+        : sort === "Name"
+          ? a.name.localeCompare(b.name)
+          : agoRank(a.last) - agoRank(b.last)
+    )
   const pageCount = Math.max(1, Math.ceil(shown.length / 10))
   const page = Math.min(pageIdx, pageCount - 1)
   const selLead = leads.find((l) => l.id === sel) ?? leads[0]
-  const timeline = [...(notes[selLead.id] ?? []), ...SEED_TIMELINE]
+  const timeline: Note[] = [
+    ...(notes[selLead.id] ?? []),
+    { date: selLead.created, note: "Lead created", system: true },
+  ]
+  const open = leads.filter((l) => l.status !== "Won" && l.status !== "Lost")
+  const closed = leads.length - open.length
   const fuLeft = fu.filter((d) => !d).length
   const filterLabel = filter === "All" ? "All statuses" : filter
   const countOf = (name: string) =>
@@ -590,7 +701,14 @@ export default function Page() {
       ? leads.length
       : leads.filter((l) => l.status === name).length
 
+  // Lead rows glide to their new order when the list changes (sort, filter,
+  // search, status); rows that newly appear fade in. Call before the change.
+  const captureRows = () => {
+    const rows = contentRef.current?.querySelectorAll('[data-flip-id^="lead-"]')
+    if (rows?.length && !reduceMotion()) rowsState.current = Flip.getState(rows)
+  }
   const pickFilter = (name: "All" | Status) => {
+    captureRows()
     setFilter(name)
     setPage(0)
   }
@@ -619,6 +737,9 @@ export default function Page() {
       status: "New",
       last: "Just now",
       value: Math.max(0, Math.round(Number(form.value) || 0)),
+      note: "",
+      next: "",
+      created: stamp(new Date()),
     }
     setLeads([lead, ...leads])
     setForm({ name: "", company: "", phone: "", value: "" })
@@ -629,20 +750,32 @@ export default function Page() {
   const addNote = (e: React.FormEvent) => {
     e.preventDefault()
     if (!note.trim()) return
-    const date = today.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-    setNotes({
-      ...notes,
-      [selLead.id]: [{ date, note: note.trim() }, ...(notes[selLead.id] ?? [])],
-    })
+    // Keep everything typed when the follow-up is incomplete.
+    if (fuOn && (!fuDate || !fuTime)) {
+      toast.error("Pick both a date and a time for the follow-up.")
+      return
+    }
+    const follow = fuOn ? stamp(new Date(`${fuDate}T${fuTime}`)) : undefined
+    const entry: Note = { date: stamp(new Date()), note: note.trim(), follow }
+    setNotes({ ...notes, [selLead.id]: [entry, ...(notes[selLead.id] ?? [])] })
     setLeads(
-      leads.map((l) => (l.id === selLead.id ? { ...l, last: "Just now" } : l))
+      leads.map((l) =>
+        l.id === selLead.id
+          ? { ...l, last: "Just now", note: entry.note, next: follow ?? l.next }
+          : l
+      )
     )
     setNote("")
-    toast.success("Note added.")
+    setFuOn(false)
+    setFuDate("")
+    setFuTime("")
+    toast.success(follow ? "Note and follow-up saved." : "Note added.")
+  }
+  const setStatus = (status: Status) => {
+    if (status === selLead.status) return
+    captureRows()
+    setLeads(leads.map((l) => (l.id === selLead.id ? { ...l, status } : l)))
+    toast.success(`Moved to ${status}.`)
   }
 
   const railNotch = (title: string, sub?: string) => (
@@ -681,11 +814,7 @@ export default function Page() {
     </Notch>
   )
   const themeButton = (
-    <RoundButton
-      data-flip-id="btn-theme"
-      onClick={toggleTheme}
-      title="Toggle theme"
-    >
+    <RoundButton onClick={toggleTheme} title="Toggle theme">
       <Sun {...ic} className="hidden dark:block" />
       <Moon {...ic} className="dark:hidden" />
     </RoundButton>
@@ -703,7 +832,6 @@ export default function Page() {
   )
   const addButton = (
     <Button
-      data-flip-id="btn-add"
       size="icon-lg"
       className="size-16 min-w-16 rounded-full p-0"
       aria-label="Add lead"
@@ -713,15 +841,33 @@ export default function Page() {
       <Plus {...ic} className="size-5" />
     </Button>
   )
-  const callouts = (items: { value: string; label: string }[]) => (
+  // Theme + the orange action (Add lead; Export on Reports) are one unit:
+  // every view has it, so it always morphs and never fades.
+  const actions = (orange: React.ReactNode) => (
+    <div data-flip-id="actions" className="flex items-center gap-2">
+      {themeButton}
+      {orange}
+    </div>
+  )
+  /** Figures with a leader line. `row` lays them out side by side
+   *  (left-aligned) instead of stacked on the hero's right. */
+  const callouts = (
+    items: { value: string; label: string }[],
+    row = compact
+  ) => (
     <div
       data-flip-id="callouts"
       className="flex flex-wrap gap-x-7 gap-y-[18px] pt-1.5 pr-2"
-      style={{ flexDirection: compact ? "row" : "column" }}
+      style={{ flexDirection: row ? "row" : "column" }}
     >
       {items.map((c, i) => (
         <div key={c.label} className="flex items-center gap-3">
-          <div className="flex flex-col items-end gap-0.5">
+          <div
+            className={cn(
+              "flex flex-col gap-0.5",
+              row && !compact ? "items-start" : "items-end"
+            )}
+          >
             <span
               data-roll={"co-v" + i}
               className="text-2xl font-light tabular-nums"
@@ -805,8 +951,8 @@ export default function Page() {
             </RailRow>
           ))}
           <div className="flex-1" />
-          <RailRow label="Settings" active={false}>
-            <Settings {...ic} />
+          <RailRow label="Log out" active={false} onClick={logOut}>
+            <LogOut {...ic} />
           </RailRow>
           <div className="flex items-center gap-3">
             <div className="grid size-13 flex-none place-items-center rounded-full bg-attention text-[15px] font-medium text-attention-foreground">
@@ -934,8 +1080,7 @@ export default function Page() {
                     </RoundButton>
                   )}
                   {bellButton}
-                  {themeButton}
-                  {addButton}
+                  {actions(addButton)}
                 </Notch>
 
                 <Notch corner="br" style={{ width: odW }}>
@@ -1120,21 +1265,34 @@ export default function Page() {
                 style={{ minHeight: cw < 1114 ? 500 : 380 }}
               >
                 <Hero padding="104px 36px 30px">
-                  <div className="flex flex-wrap gap-10">
+                  <div className="flex flex-col gap-6">
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[13px] font-medium text-muted-foreground">
                         Open value
                       </span>
-                      {bigNumber(
-                        money(
-                          leads
-                            .filter(
-                              (l) => l.status !== "Won" && l.status !== "Lost"
-                            )
-                            .reduce((a, l) => a + l.value, 0)
-                        )
-                      )}
+                      {bigNumber(money(open.reduce((a, l) => a + l.value, 0)))}
                     </div>
+                    {callouts(
+                      [
+                        { value: String(open.length), label: "Open leads" },
+                        {
+                          value: money(
+                            Math.round(
+                              leads.reduce((a, l) => a + l.value, 0) /
+                                Math.max(1, leads.length)
+                            )
+                          ),
+                          label: "Avg. lead value",
+                        },
+                        {
+                          value: closed
+                            ? Math.round((countOf("Won") / closed) * 100) + "%"
+                            : "—",
+                          label: "Win rate (closed)",
+                        },
+                      ],
+                      true
+                    )}
                   </div>
                   <div className="min-h-[30px] flex-1" />
                   <div
@@ -1174,8 +1332,7 @@ export default function Page() {
                 </Hero>
                 {railNotch("Leads", `${leads.length} total`)}
                 <Notch corner="tr" className="flex items-center gap-2">
-                  {themeButton}
-                  {addButton}
+                  {actions(addButton)}
                 </Notch>
               </div>
 
@@ -1183,7 +1340,7 @@ export default function Page() {
                 data-flip-id="leads-card"
                 className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 rounded-xl bg-background p-6"
               >
-                <div className="flex min-h-[58px] items-start justify-between pr-[460px]">
+                <div className="flex min-h-[58px] items-start justify-between pr-[720px]">
                   <Title title="Leads" sub={filterLabel} />
                 </div>
                 <Notch
@@ -1191,6 +1348,18 @@ export default function Page() {
                   data-swap
                   className="flex items-center gap-2"
                 >
+                  <Segmented
+                    aria-label="Sort leads"
+                    className="h-13 p-[5px]"
+                    itemClass="h-[42px] px-[18px]"
+                    options={["Recent", "Value", "Name"] as const}
+                    value={sort}
+                    onChange={(v) => {
+                      captureRows()
+                      setSort(v)
+                      setPage(0)
+                    }}
+                  />
                   <div className="box-border flex h-13 w-[240px] items-center gap-2.5 rounded-full bg-background px-[18px]">
                     <span className="flex text-muted-foreground">
                       <Search {...ic} />
@@ -1198,6 +1367,7 @@ export default function Page() {
                     <input
                       value={q}
                       onChange={(e) => {
+                        captureRows()
                         setQ(e.target.value)
                         setPage(0)
                       }}
@@ -1333,8 +1503,7 @@ export default function Page() {
                 </Notch>
                 <Notch corner="tr" className="flex items-center gap-2">
                   {bellButton}
-                  {themeButton}
-                  {addButton}
+                  {actions(addButton)}
                 </Notch>
               </div>
 
@@ -1489,47 +1658,44 @@ export default function Page() {
                 </Hero>
                 {railNotch("Reports", "Updated " + todayShort.split(", ")[1])}
                 <Notch corner="tr" className="flex items-center gap-2">
-                  <div
+                  <Segmented
                     data-flip-id="periods"
-                    className="box-border flex h-16 gap-1 rounded-full bg-background p-1.5"
-                  >
-                    {(Object.keys(SERIES) as (keyof typeof SERIES)[]).map(
-                      (name) => (
-                        <Pill
-                          key={name}
-                          on={period === name}
-                          onClick={() => setPeriod(name)}
-                          className={cn(
-                            "h-13",
-                            cw < 1014 ? "px-3" : "px-[18px]"
-                          )}
-                        >
-                          {name}
-                        </Pill>
-                      )
-                    )}
-                  </div>
-                  {themeButton}
-                  <Button
-                    size="icon-lg"
-                    className="size-16 min-w-16 rounded-full p-0"
-                    data-flip-id="btn-export"
-                    aria-label="Export report"
-                    title="Export report"
-                    onClick={() => toast.success("Report exported.")}
-                  >
-                    <Download {...ic} className="size-5" />
-                  </Button>
+                    className="h-16 p-1.5"
+                    itemClass={cn("h-13", cw < 1014 ? "px-3" : "px-[18px]")}
+                    options={Object.keys(SERIES) as (keyof typeof SERIES)[]}
+                    value={period}
+                    onChange={(p) => {
+                      if (!reduceMotion()) freezeRolls()
+                      setPeriod(p)
+                    }}
+                  />
+                  {actions(
+                    <Button
+                      size="icon-lg"
+                      className="size-16 min-w-16 rounded-full p-0"
+                      aria-label="Export report"
+                      title="Export report"
+                      onClick={() => toast.success("Report exported.")}
+                    >
+                      <Download {...ic} className="size-5" />
+                    </Button>
+                  )}
                 </Notch>
                 <Notch corner="bl" style={{ width: odW }}>
                   <div className="flex items-end justify-between gap-3 rounded-[28px] bg-attention px-[22px] py-5 text-attention-foreground">
                     <div className="flex flex-col gap-1">
                       <span className="text-[13px] font-medium">Win rate</span>
-                      <span className="text-sm text-attention-foreground/70">
+                      <span
+                        data-roll="win-note"
+                        className="text-sm text-attention-foreground/70"
+                      >
                         {series.winNote}
                       </span>
                     </div>
-                    <span className="text-5xl leading-none font-light tabular-nums">
+                    <span
+                      data-roll="win"
+                      className="text-5xl leading-none font-light tabular-nums"
+                    >
                       {series.win}
                     </span>
                   </div>
@@ -1541,33 +1707,35 @@ export default function Page() {
                   <Title title="Conversion" sub="By stage" />
                 </div>
                 <Notch corner="tr">
-                  <div className="box-border flex h-13 gap-1 rounded-full bg-background p-[5px]">
-                    {(["Count", "Value"] as const).map((name) => (
-                      <Pill
-                        key={name}
-                        on={mode === name}
-                        onClick={() => setMode(name)}
-                        className="h-[42px] px-[18px]"
-                      >
-                        {name}
-                      </Pill>
-                    ))}
-                  </div>
+                  <Segmented
+                    className="h-13 p-[5px]"
+                    itemClass="h-[42px] px-[18px]"
+                    options={["Count", "Value"] as const}
+                    value={mode}
+                    onChange={setMode}
+                  />
                 </Notch>
-                <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
+                {/* Funnel: right-aligned bars whose length and opacity both
+                    follow the stage's share of the largest stage. */}
+                <div className="flex min-h-0 flex-col gap-1 overflow-y-auto">
                   {STAGES.map(([name, dot]) => (
                     <div
                       key={name}
-                      className="grid grid-cols-[130px_minmax(0,1fr)_84px] items-center gap-3.5 rounded-[18px] bg-card px-4 py-3"
+                      className="grid grid-cols-[130px_minmax(0,1fr)_84px] items-center gap-3.5 px-1"
                     >
                       <span className="flex items-center gap-2 text-[13px] font-medium whitespace-nowrap">
                         <Dot color={dot} />
                         {name}
                       </span>
-                      <span className="h-2.5 overflow-hidden rounded-full bg-secondary">
+                      <span className="flex justify-end">
                         <span
-                          className="block h-full rounded-full bg-foreground transition-[width] duration-300"
-                          style={{ width: (funnel[name] / fmax) * 100 + "%" }}
+                          title={`${name}: ${mode === "Count" ? funnel[name] : money(funnel[name])}`}
+                          className="block h-9 min-w-9 rounded-full bg-foreground transition-[width,opacity] duration-300"
+                          style={{
+                            width: (funnel[name] / fmax) * 100 + "%",
+                            // Floor so the smallest stage stays visible.
+                            opacity: Math.max(0.15, funnel[name] / fmax),
+                          }}
                         />
                       </span>
                       <span className="text-right text-[15px] font-light tabular-nums">
@@ -1584,24 +1752,39 @@ export default function Page() {
                     title="Lead sources"
                     sub={series.label}
                     subClass="opacity-70"
+                    subRoll="src-sub"
                   />
-                  <span className="text-[13px] font-medium">
+                  <span
+                    data-roll="src-leads"
+                    className="text-[13px] font-medium"
+                  >
                     {series.leads} leads
                   </span>
                 </div>
-                <div className="flex flex-col gap-3.5">
-                  {SOURCES.map(([name, p]) => (
-                    <div key={name} className="flex flex-col gap-2">
-                      <div className="flex justify-between text-sm font-medium">
-                        <span>{name}</span>
-                        <span className="tabular-nums">{p}%</span>
-                      </div>
-                      <span className="h-2 overflow-hidden rounded-full bg-brand-ink/22">
-                        <span
-                          className="block h-full rounded-full bg-brand-ink"
-                          style={{ width: (p / SOURCES[0][1]) * 100 + "%" }}
-                        />
-                      </span>
+                {/* Part-to-whole: one bar split by share, largest first, in
+                    steps of the ink (2px surface gaps between segments). */}
+                <div className="flex h-14 gap-0.5 overflow-hidden rounded-[18px]">
+                  {SOURCES.map(([name, p], i) => (
+                    <span
+                      key={name}
+                      title={`${name}: ${p}%`}
+                      className="rounded-[4px] bg-brand-ink"
+                      style={{ flexGrow: p, opacity: SOURCE_INK[i] }}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-col gap-2.5">
+                  {SOURCES.map(([name, p], i) => (
+                    <div
+                      key={name}
+                      className="flex items-center gap-2.5 text-sm font-medium"
+                    >
+                      <span
+                        className="size-2.5 flex-none rounded-full bg-brand-ink"
+                        style={{ opacity: SOURCE_INK[i] }}
+                      />
+                      <span className="flex-1">{name}</span>
+                      <span className="tabular-nums">{p}%</span>
                     </div>
                   ))}
                 </div>
@@ -1619,35 +1802,107 @@ export default function Page() {
           <SheetHeader>
             <SheetTitle>{selLead.name}</SheetTitle>
             <SheetDescription>
-              {[selLead.company, selLead.phone, selLead.status]
+              {[selLead.company, selLead.phone, money(selLead.value)]
                 .filter(Boolean)
                 .join(" · ")}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex flex-col gap-1.5 overflow-y-auto px-4">
-            {timeline.map((t, i) => (
-              <div
-                key={i}
-                className="flex flex-col gap-1 rounded-[18px] bg-muted px-4 py-3 text-sm"
-              >
-                <span className="text-xs text-muted-foreground">{t.date}</span>
-                {t.note}
-              </div>
-            ))}
+          <div
+            role="group"
+            aria-label="Status"
+            className="flex flex-wrap gap-1.5 px-4 pb-2"
+          >
+            {STAGES.map(([name, dot]) => {
+              const on = selLead.status === name
+              return (
+                <button
+                  key={name}
+                  aria-pressed={on}
+                  onClick={() => setStatus(name)}
+                  className={cn(
+                    "flex h-9 cursor-pointer items-center gap-1.5 rounded-full border-0 px-3 text-xs font-medium transition-colors duration-200",
+                    on
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-foreground hover:bg-secondary"
+                  )}
+                >
+                  <Dot color={dot} />
+                  {name}
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-4">
+            {timeline.map((t, i) =>
+              t.system ? (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground"
+                >
+                  <span className="size-1.5 rounded-full bg-muted-foreground" />
+                  {t.note} · {t.date}
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className="flex flex-col gap-1 rounded-[18px] bg-muted px-4 py-3 text-sm"
+                >
+                  <span className="text-xs text-muted-foreground">
+                    {t.date}
+                  </span>
+                  {t.note}
+                  {t.follow && (
+                    <span className="mt-1 flex items-center gap-1.5 text-xs font-medium">
+                      <Calendar size={12} strokeWidth={1.75} />
+                      Follow-up {t.follow}
+                    </span>
+                  )}
+                </div>
+              )
+            )}
           </div>
           <SheetFooter>
-            <form onSubmit={addNote} className="flex flex-col gap-2">
+            <form onSubmit={addNote} className="flex flex-col gap-2.5">
               <Label htmlFor="note" className="sr-only">
                 Note
               </Label>
-              <Input
+              <textarea
                 id="note"
+                rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="What was discussed?"
+                className="w-full resize-none rounded-[18px] border border-transparent bg-input/50 px-4 py-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
               />
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={fuOn}
+                  onChange={(e) => setFuOn(e.target.checked)}
+                  className="size-4 accent-primary"
+                />
+                Set follow-up
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  aria-label="Follow-up date"
+                  disabled={!fuOn}
+                  required={fuOn}
+                  value={fuDate}
+                  onChange={(e) => setFuDate(e.target.value)}
+                />
+                <Input
+                  type="time"
+                  aria-label="Follow-up time"
+                  disabled={!fuOn}
+                  required={fuOn}
+                  value={fuTime}
+                  onChange={(e) => setFuTime(e.target.value)}
+                />
+              </div>
               <Button type="submit" disabled={!note.trim()}>
-                Add note
+                Save note
               </Button>
             </form>
           </SheetFooter>
@@ -1728,15 +1983,20 @@ function Title({
   title,
   sub,
   subClass = "text-muted-foreground",
+  subRoll,
 }: {
   title: string
   sub: string
   subClass?: string
+  /** data-roll key, when the subtitle changes in place. */
+  subRoll?: string
 }) {
   return (
     <h2 className="m-0 text-2xl leading-[1.2] font-light">
       {title}
-      <span className={cn("block", subClass)}>{sub}</span>
+      <span data-roll={subRoll} className={cn("block", subClass)}>
+        {sub}
+      </span>
     </h2>
   )
 }
@@ -1784,8 +2044,12 @@ function RailRow({
       data-nav-row={index}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative box-border flex h-13 w-full min-w-13 cursor-pointer items-center gap-3 overflow-hidden rounded-full border-0 bg-transparent px-4 transition-colors duration-300 [&>svg]:shrink-0",
-        active ? "text-background" : "text-muted-foreground"
+        "relative box-border flex h-13 w-full min-w-13 cursor-pointer items-center gap-3 overflow-hidden rounded-full border-0 bg-transparent px-4 transition-colors duration-200 [&>svg]:shrink-0",
+        // Hover tints only rows the sliding pill isn't on (Tailwind's hover:
+        // already skips touch screens).
+        active
+          ? "text-background"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       {children}
@@ -1799,23 +2063,85 @@ function RailRow({
   )
 }
 
-function Pill({
-  on,
+/** Pill toggle whose dark highlight slides to the chosen option (FLIP: the
+ *  highlight renders inside the active button, then tweens from where the
+ *  old one was). */
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
   className,
+  itemClass,
   ...props
-}: React.ComponentProps<"button"> & { on: boolean }) {
+}: {
+  options: readonly T[]
+  value: T
+  onChange: (value: T) => void
+  itemClass?: string
+} & Omit<React.ComponentProps<"div">, "onChange">) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const from = React.useRef<DOMRect | null>(null)
+  const pill = () => ref.current?.querySelector<HTMLElement>("[data-seg-pill]")
+  useGSAP(
+    () => {
+      const old = from.current
+      from.current = null
+      const el = pill()
+      if (!old || !el) return
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+      const now = el.getBoundingClientRect()
+      gsap.fromTo(
+        el,
+        { x: old.left - now.left, width: old.width },
+        {
+          x: 0,
+          width: now.width,
+          duration: 0.4,
+          ease: "power3.inOut",
+          clearProps: "transform,width",
+        }
+      )
+    },
+    { scope: ref, dependencies: [value] }
+  )
   return (
-    <button
-      aria-pressed={on}
+    <div
+      ref={ref}
       className={cn(
-        "cursor-pointer rounded-full border-0 text-[13px] font-medium transition-colors duration-200",
-        on
-          ? "bg-foreground text-background"
-          : "bg-transparent text-muted-foreground",
+        "box-border flex gap-1 rounded-full bg-background",
         className
       )}
       {...props}
-    />
+    >
+      {options.map((name) => {
+        const on = name === value
+        return (
+          <button
+            key={name}
+            aria-pressed={on}
+            onClick={() => {
+              if (on) return
+              from.current = pill()?.getBoundingClientRect() ?? null
+              onChange(name)
+            }}
+            className={cn(
+              "relative cursor-pointer rounded-full border-0 bg-transparent text-[13px] font-medium transition-colors duration-400",
+              on ? "text-background" : "text-muted-foreground",
+              itemClass
+            )}
+          >
+            {on && (
+              <span
+                data-seg-pill
+                aria-hidden
+                className="absolute inset-y-0 left-0 w-full rounded-full bg-foreground"
+              />
+            )}
+            <span className="relative z-10">{name}</span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -1851,7 +2177,7 @@ function LeadTable({
       >
         <span>Name</span>
         <span>Status</span>
-        <span>Last touch</span>
+        <span>Last note</span>
         <span className="text-right">Value</span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
@@ -1860,20 +2186,31 @@ function LeadTable({
             key={l.id}
             data-flip-id={"lead-" + l.id}
             onClick={() => onOpen(l.id)}
-            className="grid cursor-pointer items-center gap-3 rounded-[18px] border-0 bg-card px-4 py-3 text-left text-foreground hover:bg-secondary"
+            className="grid cursor-pointer items-center gap-3 rounded-[18px] border-0 bg-card px-4 py-3 text-left text-foreground transition-colors duration-150 hover:bg-secondary"
             style={{ gridTemplateColumns: LEAD_COLS }}
           >
             <span className="flex min-w-0 flex-col gap-px">
               <span className="truncate text-sm font-medium">{l.name}</span>
               <span className="text-xs text-muted-foreground">{l.company}</span>
             </span>
-            <span>
+            <span className="flex min-w-0 flex-col items-start gap-1">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-[3px] text-xs font-medium">
                 <Dot color={DOT[l.status]} />
                 {l.status}
               </span>
+              {nextOf(l) && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar size={12} strokeWidth={1.75} />
+                  {nextOf(l)}
+                </span>
+              )}
             </span>
-            <span className="text-[13px] text-muted-foreground">{l.last}</span>
+            <span className="flex min-w-0 flex-col gap-px">
+              <span className="truncate text-[13px]">
+                {l.note || "No notes yet"}
+              </span>
+              <span className="text-xs text-muted-foreground">{l.last}</span>
+            </span>
             <span className="text-right text-[15px] font-light tabular-nums">
               {money(l.value)}
             </span>
@@ -1887,6 +2224,12 @@ function LeadTable({
       </div>
     </>
   )
+}
+
+/** Next follow-up: one set from a note, else today's scheduled one. */
+const nextOf = (l: Lead) => {
+  const f = FU.find((x) => x.name === l.name)
+  return l.next || (f ? "Today, " + f.time : "")
 }
 
 /** The popup's surface with its top-right corner cut out for the close button. */
@@ -1931,6 +2274,25 @@ const inr = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
 })
 const money = (v: number) => inr.format(v)
+/** "15 Oct, 2:00 pm" */
+const stamp = (d: Date) =>
+  d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+/** Sort key for "last touch" labels, newest first: Just now, Today hh:mm,
+ *  Yesterday, "n days ago", then dated ones ("12 Oct"). */
+const agoRank = (s: string) => {
+  if (s === "Just now") return 0
+  const t = /^Today, (\d+):(\d+)/.exec(s)
+  if (t) return 1 - (+t[1] * 60 + +t[2]) / 1440
+  if (s === "Yesterday") return 2
+  const n = /^(\d+) days ago/.exec(s)
+  if (n) return 1 + +n[1]
+  return 100 - (parseInt(s) || 0)
+}
 // Short bar labels: ₹42.6k, ₹1.2L.
 const kfmt = (v: number) =>
   v === 0
@@ -1987,7 +2349,7 @@ const SHAPE_IDS = [
   "notch-tr",
   "btn-rail",
   "title-pill",
-  "btn-theme",
+  "actions",
 ]
 const VIEW_FLIP: Record<number, string[]> = {
   0: [
@@ -1995,14 +2357,13 @@ const VIEW_FLIP: Record<number, string[]> = {
     "notch-att",
     "btn-search",
     "btn-bell",
-    "btn-add",
     "big",
     "callouts",
     "leads-card",
   ],
-  1: [...SHAPE_IDS, "btn-add", "big", "leads-card"],
-  2: [...SHAPE_IDS, "notch-att", "btn-bell", "btn-add"],
-  3: [...SHAPE_IDS, "notch-att", "periods", "btn-export", "big", "callouts"],
+  1: [...SHAPE_IDS, "big", "callouts", "leads-card"],
+  2: [...SHAPE_IDS, "notch-att", "btn-bell"],
+  3: [...SHAPE_IDS, "notch-att", "periods", "big", "callouts"],
 }
 
 const STAGES = [
@@ -2043,6 +2404,15 @@ const FUNNEL_VAL: Record<Status, number> = {
   Won: 42600,
   Lost: 12300,
 }
+// Sample latest note per status (illustrative).
+const SEED_NOTE: Record<Status, string> = {
+  New: "Came in through the website form.",
+  Contacted: "Left a voicemail, will try again.",
+  Qualified: "Budget confirmed, wants a demo.",
+  "Proposal Sent": "Proposal sent, waiting on sign-off.",
+  Won: "Signed the annual plan.",
+  Lost: "Went with a cheaper vendor.",
+}
 const LEADS: Lead[] = (
   [
     ["Priya Sharma", "Acme Corp", "Qualified", "Today, 10:20", 18400],
@@ -2080,11 +2450,10 @@ const LEADS: Lead[] = (
   status,
   last,
   value,
+  note: SEED_NOTE[status],
+  next: "",
+  created: "1 Oct 2026",
 }))
-const SEED_TIMELINE: Note[] = [
-  { date: "12 Oct 2026", note: "Intro call, keen on a demo." },
-  { date: "10 Oct 2026", note: "Lead created from the website form." },
-]
 const FU = [
   {
     name: "Priya Sharma",
@@ -2185,6 +2554,8 @@ const SERIES = {
   string,
   { bars: [string, number][] } & Record<string, unknown>
 >
+// Segment opacity per source rank (SOURCES is sorted largest first).
+const SOURCE_INK = [1, 0.78, 0.58, 0.42, 0.28]
 const SOURCES = [
   ["Website form", 34],
   ["Referral", 22],
