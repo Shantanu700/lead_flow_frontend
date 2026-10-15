@@ -170,6 +170,13 @@ export default function Page() {
   //    slide toward their nearest edge, hero/notch details fade.
   // Out (0.25s) runs before React swaps the view; In runs after.
   const flipState = React.useRef<Flip.FlipState | null>(null)
+  // Filter change: the chip highlight's old box, and whether the list's
+  // label and count should roll once the new page arrives.
+  const chipFrom = React.useRef<DOMRect | null>(null)
+  const rollOnList = React.useRef(false)
+  // Overdue card: direction of the step in progress (-1 back, 1 forward).
+  const odDir = React.useRef(0)
+  const odRef = React.useRef<HTMLDivElement>(null)
   // Lead rows before a list change (see captureRows).
   const rowsState = React.useRef<Flip.FlipState | null>(null)
   const prevIds = React.useRef<Set<string>>(new Set())
@@ -659,6 +666,10 @@ export default function Page() {
 
   useGSAP(
     () => {
+      if (rollOnList.current) {
+        rollOnList.current = false
+        rollTexts()
+      }
       const from = rowsState.current
       rowsState.current = null
       if (!from) return
@@ -677,6 +688,70 @@ export default function Page() {
       })
     },
     { scope: contentRef, dependencies: [list] }
+  )
+
+  // Filter chips: the dark highlight slides from the old chip to the new one,
+  // across rows if it has to.
+  useGSAP(
+    () => {
+      const old = chipFrom.current
+      chipFrom.current = null
+      const pill =
+        contentRef.current?.querySelector<HTMLElement>("[data-chip-pill]")
+      if (!old || !pill) return
+      const now = pill.getBoundingClientRect()
+      gsap.fromTo(
+        pill,
+        {
+          x: old.left - now.left,
+          y: old.top - now.top,
+          width: old.width,
+          height: old.height,
+        },
+        {
+          x: 0,
+          y: 0,
+          width: now.width,
+          height: now.height,
+          duration: 0.3,
+          ease: "power3.inOut",
+          clearProps: "transform,width,height",
+        }
+      )
+    },
+    { scope: contentRef, dependencies: [filter] }
+  )
+
+  // Overdue card: the next lead slides in from the side you stepped towards.
+  useGSAP(
+    () => {
+      const dir = odDir.current
+      odDir.current = 0
+      if (!dir || !odRef.current) return
+      gsap.fromTo(
+        odRef.current.querySelectorAll("[data-od-slide]"),
+        { x: dir * 24, opacity: 0 },
+        {
+          x: 0,
+          opacity: 1,
+          duration: 0.25,
+          ease: "power3.out",
+          clearProps: "transform,opacity",
+        }
+      )
+      gsap.fromTo(
+        odRef.current.querySelector("[data-od-num]"),
+        { yPercent: dir * 100, opacity: 0 },
+        {
+          yPercent: 0,
+          opacity: 1,
+          duration: 0.25,
+          ease: "power3.out",
+          clearProps: "transform,opacity",
+        }
+      )
+    },
+    { scope: odRef, dependencies: [od] }
   )
 
   // Rail highlight: one pill slides to the active row instead of each row
@@ -798,7 +873,14 @@ export default function Page() {
   React.useEffect(() => {
     if (!ready || (view !== 0 && view !== 1)) return
     const t = setTimeout(
-      () => fetchList(view).catch((e) => toast.error(describeApiError(e))),
+      () =>
+        fetchList(view).catch((e) => {
+          toast.error(describeApiError(e))
+          if (rollOnList.current) {
+            rollOnList.current = false
+            rollTexts() // shows the frozen text again
+          }
+        }),
       q ? 200 : 0
     )
     return () => clearTimeout(t)
@@ -812,7 +894,18 @@ export default function Page() {
     if (rows?.length && !reduceMotion()) rowsState.current = Flip.getState(rows)
   }
   const pickFilter = (name: "All" | Status) => {
+    if (name === filter) return
     captureRows()
+    if (!reduceMotion()) {
+      chipFrom.current =
+        contentRef.current
+          ?.querySelector("[data-chip-pill]")
+          ?.getBoundingClientRect() ?? null
+      // The label changes now and the count when the page arrives; freeze
+      // both so they roll together then.
+      freezeRolls()
+      rollOnList.current = true
+    }
     setFilter(name)
     setPage(0)
   }
@@ -990,6 +1083,35 @@ export default function Page() {
     el.scrollLeft = next ? next.offsetLeft - el.offsetLeft : 0
     readStrip()
   }, [view])
+
+  // Overdue card: the current lead slides out, then the swap (the effect
+  // slides the next one in). contextSafe so the tweens join the GSAP context.
+  const stepOd = (dir: 1 | -1) =>
+    contextSafe(() => {
+      const n = overdue.length
+      if (n < 2) return
+      const next = (Math.min(od, n - 1) + dir + n) % n
+      const el = odRef.current
+      if (reduceMotion() || !el) return setOd(next)
+      const out = {
+        opacity: 0,
+        duration: 0.12,
+        ease: "power2.out",
+        overwrite: true,
+      }
+      gsap.to(el.querySelector("[data-od-num]"), {
+        ...out,
+        yPercent: -dir * 100,
+      })
+      gsap.to(el.querySelector("[data-od-slide]"), {
+        ...out,
+        x: -dir * 24,
+        onComplete: () => {
+          odDir.current = dir
+          setOd(next)
+        },
+      })
+    })()
 
   const railNotch = (title: string, sub?: string) => (
     <Notch corner="tl" className="flex items-center gap-2">
@@ -1315,27 +1437,37 @@ export default function Page() {
                 </Notch>
 
                 <Notch corner="br" style={{ width: odW }}>
-                  <div className="flex flex-col gap-3.5 rounded-[28px] bg-attention px-[22px] py-5 text-attention-foreground">
+                  <div
+                    ref={odRef}
+                    className="flex flex-col gap-3.5 overflow-hidden rounded-[28px] bg-attention px-[22px] py-5 text-attention-foreground"
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-medium">
-                        {odLead
-                          ? `Overdue · ${Math.min(od, overdue.length - 1) + 1} of ${overdue.length}`
-                          : "Overdue"}
+                      <span className="flex text-[13px] font-medium">
+                        Overdue
+                        {odLead && (
+                          <>
+                            &nbsp;·&nbsp;
+                            <span className="inline-flex overflow-hidden">
+                              <span data-od-num className="inline-block">
+                                {Math.min(od, overdue.length - 1) + 1}
+                              </span>
+                            </span>
+                            &nbsp;of {overdue.length}
+                          </>
+                        )}
                       </span>
                       <div className="flex gap-1.5">
                         <AttentionButton
                           title="Previous"
                           disabled={overdue.length < 2}
-                          onClick={() =>
-                            setOd((od + overdue.length - 1) % overdue.length)
-                          }
+                          onClick={() => stepOd(-1)}
                         >
                           <ArrowLeft {...sm} />
                         </AttentionButton>
                         <AttentionButton
                           title="Next"
                           disabled={overdue.length < 2}
-                          onClick={() => setOd((od + 1) % overdue.length)}
+                          onClick={() => stepOd(1)}
                         >
                           <ArrowRight {...sm} />
                         </AttentionButton>
@@ -1343,6 +1475,7 @@ export default function Page() {
                     </div>
                     {odLead ? (
                       <button
+                        data-od-slide
                         onClick={() => openLead(odLead.id)}
                         className="cursor-pointer border-0 bg-transparent p-0 text-left text-[22px] leading-[1.2] font-light text-attention-foreground"
                       >
@@ -1448,7 +1581,7 @@ export default function Page() {
                       subClass="opacity-70"
                     />
                     <span className="text-[13px] font-medium">
-                      {list.count} shown
+                      <span data-roll="list-count">{list.count} shown</span>
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1460,16 +1593,27 @@ export default function Page() {
                           onClick={() => pickFilter(name)}
                           aria-pressed={on}
                           className={cn(
-                            "inline-flex h-9 cursor-pointer items-center gap-[7px] rounded-full border px-3.5 text-[13px] font-medium transition-colors duration-200",
+                            "relative inline-flex h-9 cursor-pointer items-center gap-[7px] rounded-full border bg-transparent px-3.5 text-[13px] font-medium transition-colors duration-300",
                             on
-                              ? "border-brand-ink bg-brand-ink text-brand-surface"
-                              : "border-brand-ink/35 bg-transparent text-brand-ink"
+                              ? "border-brand-ink text-brand-surface"
+                              : "border-brand-ink/35 text-brand-ink"
                           )}
                         >
-                          {dot && <Dot color={dot} />}
-                          {name}
-                          <span className="tabular-nums opacity-70">
-                            {countOf(name, leadStats?.by_status)}
+                          {/* The highlight slides between chips (see the
+                              filter-chip effect); the label sits above it. */}
+                          {on && (
+                            <span
+                              data-chip-pill
+                              aria-hidden
+                              className="absolute -inset-px rounded-full bg-brand-ink"
+                            />
+                          )}
+                          <span className="relative z-10 inline-flex items-center gap-[7px]">
+                            {dot && <Dot color={dot} />}
+                            {name}
+                            <span className="tabular-nums opacity-70">
+                              {countOf(name)}
+                            </span>
                           </span>
                         </button>
                       )
@@ -1495,7 +1639,7 @@ export default function Page() {
                 className="relative flex min-h-0 min-w-0 flex-col gap-3.5 rounded-xl bg-background p-6"
               >
                 <div className="flex min-h-[58px] items-start justify-between pr-[200px]">
-                  <Title title="Leads" sub={filterLabel} />
+                  <Title title="Leads" sub={filterLabel} subRoll="list-sub" />
                 </div>
                 <Notch corner="tr" data-swap>
                   <button
@@ -1570,7 +1714,7 @@ export default function Page() {
                           )}
                         >
                           <span className="text-[32px] leading-none font-light tabular-nums">
-                            {countOf(name)}
+                            {countOf(name, leadStats?.by_status)}
                           </span>
                           <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap">
                             {dot && <Dot color={dot} />}
@@ -1595,7 +1739,7 @@ export default function Page() {
                 className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 rounded-xl bg-background p-6"
               >
                 <div className="flex min-h-[58px] items-start justify-between pr-[720px]">
-                  <Title title="Leads" sub={filterLabel} />
+                  <Title title="Leads" sub={filterLabel} subRoll="list-sub" />
                 </div>
                 <Notch
                   corner="tr"
