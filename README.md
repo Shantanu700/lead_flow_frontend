@@ -299,29 +299,75 @@ The mockups represent a single-screen user experience. This does not mean the ap
 
 ## Getting Started
 
-Setup commands depend on the actual repository and should be added once the stack and scripts are confirmed.
+LeadFlow has two repositories: this Next.js frontend and the Django REST backend (`../backend`). Both run over HTTPS on `localhost`, so the browser treats them as the same site and the login session cookie works.
 
 ### Prerequisites
 
-Install the tools required by the chosen implementation. For a React/Next.js and Django REST Framework setup, this will typically include:
-
 - Git
-- Node.js and the package manager used by the frontend
-- Python and the version supported by the backend
-- PostgreSQL, if used as the database
+- [Bun](https://bun.sh) (the frontend's package manager)
+- Docker with Docker Compose (the backend runs in containers)
+- [mkcert](https://github.com/FiloSottile/mkcert) for the local HTTPS certificates
 
-### Setup checklist
+### 1. Start the backend
 
-1. Clone the repository.
-2. Install frontend dependencies.
-3. Create and activate a Python virtual environment if using Django.
-4. Install backend dependencies from the project's dependency file.
-5. Configure local environment variables.
-6. Create the database and apply migrations if applicable.
-7. Start the backend and frontend using the scripts defined in the repository.
-8. Verify that a lead can be created, opened, updated, and given a discussion with an optional follow-up.
+Follow the backend's `README.md` ("First run"). In short: start the shared Postgres and Redis stack, fill in `.env`, run `docker compose -f docker/dev/docker-compose.yml up -d --build`, create the certificate in `backend/certs/`, then inside the `leadflow_dev_web` container:
 
-> Replace this checklist with verified commands from the actual repository before publishing. Do not add environment variables or commands that the application does not use.
+```bash
+python manage.py makemigrations && python manage.py migrate
+python manage.py runsslserver 0.0.0.0:8001 --certificate certs/localhost.pem --key certs/localhost-key.pem
+```
+
+The API is then at https://localhost:8011 (Swagger at `/api/schema/swagger-ui/`, Redoc at `/api/schema/redoc/`).
+
+Optional sample data (development only, needs `DJANGO_DEBUG=1`):
+
+```bash
+python manage.py seed_leads            # refuses if leads already exist
+python manage.py seed_leads --reset    # deletes every lead and discussion first
+```
+
+### 2. Start the frontend
+
+```bash
+bun install
+mkcert -install                         # once per machine; browsers then trust the certificates
+mkcert -cert-file certificates/localhost.pem -key-file certificates/localhost-key.pem localhost 127.0.0.1 ::1
+bun dev                                 # https://localhost:3000
+```
+
+The API address defaults to `https://localhost:8011`. To use another one, set it in `.env.local` (gitignored):
+
+```bash
+NEXT_PUBLIC_API_URL=https://localhost:8011
+```
+
+Open https://localhost:3000, register an account on the sign-in page, and you land on the dashboard.
+
+### 3. After an API change
+
+The typed API client in `src/client/` is generated from the backend's OpenAPI schema. With the backend running, regenerate it (never edit `src/client/` by hand):
+
+```bash
+bun run openapi-ts
+```
+
+### Checks
+
+```bash
+bun run typecheck     # TypeScript
+bun run lint          # ESLint (lint changed files if the ds-bundle/ folder is present)
+bun run format        # Prettier
+```
+
+Backend tests run inside the `leadflow_dev_web` container with `python -m pytest`.
+
+### How this build differs from the suggested contract
+
+- Updates use `PUT /api/leads/{id}/` (not `PATCH`).
+- `GET /api/leads/` is paginated (`page`, `page_size` up to 50) and also takes `status`, `q` (searches name, company, phone and the latest note) and `ordering=recent|value|name`.
+- Leads also carry an estimated `value` (₹) and a `source`.
+- Extra endpoints: `/api/follow-ups/overdue/`, `/api/follow-ups/upcoming/`, and per-tab figures at `/api/stats/dashboard|leads|reports/`.
+- Sign-in is required (email and password, Django session).
 
 ## Testing Checklist
 

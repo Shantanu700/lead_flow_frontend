@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Frontend for **LeadFlow**, a single-screen CRM (lead list, status filters, "Today's Follow-ups", Add Lead modal, lead timeline dialog). `README.md` is the product spec: requirements, business rules, suggested data model and REST contract (`/api/leads/`, `/api/leads/{id}/discussions/`, `/api/follow-ups/today/`). Read it before building features. The backend is not in this directory; the repo currently holds only the shadcn starter scaffold.
+Frontend for **LeadFlow**, a single-screen CRM (lead list, status filters, "Today's Follow-ups", Add Lead modal, lead timeline dialog). `README.md` is the product spec: requirements, business rules, suggested data model and REST contract (`/api/leads/`, `/api/leads/{id}/discussions/`, `/api/follow-ups/today/`). Read it before building features; its "Getting Started" section has the setup for both servers. The backend (Django REST, in `../backend`) is a separate repo.
 
 Spec rules that are easy to get wrong:
 - Everything happens on one screen. Opening a lead shows a dialog; it never navigates to a details page.
@@ -26,7 +26,18 @@ The package manager is Bun (`bun.lock`).
 - `bun run typecheck`: `tsc --noEmit`
 - `bun run format`: Prettier with the Tailwind class-sorting plugin
 
-No test runner is set up yet.
+No test runner is set up yet. Check UI changes in a real browser at desktop (1440px), tablet (~900px) and phone (390px) widths. Backend tests run in the `leadflow_dev_web` container with `python -m pytest`; `python manage.py seed_leads --reset` restores the sample leads.
+
+## The dashboard
+
+`app/dashboard/page.tsx` is the whole app after sign-in: one client component with four tabs (Dashboard, Leads, Follow-ups, Reports) switched by state, not routes. The lead panel (sheet), the Add/Edit lead dialog and the command palette (`components/command-palette.tsx`, search button or ⌘K) open over it.
+
+- **Layout** follows the frame width `w` from a ResizeObserver, not CSS breakpoints: `phone` (under 600px: the rail becomes a bottom tab bar and every tab stacks and scrolls), `narrow`, `compact`. Change these together.
+- **Animation** uses GSAP (`@gsap/react`, Flip). Tab switches morph the shared hero and notches (`data-flip-id`; `SHAPE_IDS` / `VIEW_FLIP` list what each view renders) and roll changing text (`data-roll`). Keep those attributes when editing markup, and keep animations working; the user checks them closely.
+- **Notches** (`components/notch.tsx`) are the card-coloured corner cut-outs that hold controls.
+- **Data:** each tab loads only what it shows, and search, filters, sorting and paging all happen on the server (`GET /api/leads/?page=&status=&q=&ordering=`). Do not filter or sort in the browser. Per-tab figures come from `/api/stats/dashboard|leads|reports/`.
+- **Saves:** updates use `PUT`, never `PATCH`. Show only saved data; on failure call `toastFailure()` (`lib/api.ts`) and keep the form values.
+- **Controls:** dropdowns use the shadcn `Select` (never a native `<select>`); dates and times use `components/date-time-picker.tsx`.
 
 ## Stack and conventions
 
