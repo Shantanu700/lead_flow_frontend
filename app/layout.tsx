@@ -35,8 +35,9 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
-          {/* Phones: above the dashboard's bottom tab bar. */}
-          <Toaster position="bottom-right" mobileOffset={{ bottom: 104 }} />
+          {/* Top centre: clear of the lead panel's Save button (bottom
+              right) and the phone tab bar (bottom). */}
+          <Toaster position="top-center" />
         </ThemeProvider>
       </body>
     </html>

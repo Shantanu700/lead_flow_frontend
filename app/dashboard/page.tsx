@@ -1835,7 +1835,8 @@ export default function Page() {
                 className="flex min-w-0 gap-2.5"
                 style={
                   compact
-                    ? { gridColumn: 1, gridRow: 3, flexWrap: "wrap" }
+                    ? // Stacked: above the lead list (the spec's pinned section).
+                      { gridColumn: 1, gridRow: 2, flexWrap: "wrap" }
                     : {
                         gridRow: "span 2",
                         flexDirection: "column",
@@ -1880,19 +1881,37 @@ export default function Page() {
                             onClick={() => openLead(l.id)}
                             className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 border-0 bg-transparent p-0 text-left text-foreground"
                           >
-                            <span
-                              className={cn(
-                                "truncate text-sm font-medium",
-                                done && "line-through"
+                            <span className="truncate text-sm">
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  done && "line-through"
+                                )}
+                              >
+                                {l.name}
+                              </span>
+                              {l.company && (
+                                <span className="text-muted-foreground">
+                                  {" · " + l.company}
+                                </span>
                               )}
-                            >
-                              {l.name}
                             </span>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {hhmm(l.next_follow_up_at)} ·{" "}
-                              {l.last_note?.note ?? "Follow up"}
+                            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                              <Dot color={DOT[l.status]} />
+                              <span className="flex-none text-foreground">
+                                {l.status}
+                              </span>
+                              <span className="truncate">
+                                {"· " +
+                                  (l.last_note
+                                    ? `${l.last_note.note} · ${ago(lastAt(l))}`
+                                    : "No notes yet")}
+                              </span>
                             </span>
                           </button>
+                          <span className="flex-none text-[15px] font-light tabular-nums">
+                            {hhmm(l.next_follow_up_at)}
+                          </span>
                           <button
                             onClick={() => toggleFu(l)}
                             title={done ? "Mark as not done" : "Mark as done"}
@@ -1975,6 +1994,7 @@ export default function Page() {
               <section
                 data-flip-id="leads-card"
                 className="relative flex min-h-0 min-w-0 flex-col gap-3.5 rounded-xl bg-background p-6"
+                style={compact ? { gridRow: 3 } : undefined}
               >
                 {/* Phones: below the notch rather than beside it. */}
                 <div
@@ -2744,7 +2764,22 @@ export default function Page() {
                     onChange={(e) =>
                       setForm({ ...form, [key]: e.target.value })
                     }
+                    aria-invalid={
+                      key === "name" && !!form.name && !form.name.trim()
+                    }
+                    aria-describedby={
+                      key === "name" ? "lead-name-error" : undefined
+                    }
                   />
+                  {key === "name" && !!form.name && !form.name.trim() && (
+                    <span
+                      id="lead-name-error"
+                      role="alert"
+                      className="text-xs text-destructive"
+                    >
+                      Enter a name, not just spaces.
+                    </span>
+                  )}
                 </div>
               ))}
               <div className="flex flex-col gap-2">
@@ -3040,6 +3075,11 @@ function LeadTable({
               <span className="text-xs text-muted-foreground">
                 {l.company || "—"}
               </span>
+              {stacked && (
+                <span className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {l.last_note?.note ?? "No notes yet"} · {ago(lastAt(l))}
+                </span>
+              )}
               {stacked && <span className="mt-1.5">{status(l)}</span>}
             </span>
             {!stacked && status(l)}
