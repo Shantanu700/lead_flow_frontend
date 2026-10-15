@@ -17,6 +17,7 @@ Tokens live in `app/globals.css`. Use the Tailwind classes they generate (`bg-ca
 | Highlight | `highlight` | `#F75831` | `#F75831` | The reference orange: status dots, chart series, focus rings, large accent words |
 | Brand surface | `brand-surface` | `#E5532F` | `#E5532F` | Large orange surfaces, such as the `/auth` follow-up card. It is the brand orange deepened 8% towards ink, so a big area doesn't glare. Use `brand-ink` text on it (4.6:1); muted ink at 70% only for 24px+ text (3.1:1). Small orange elements stay `primary`. |
 | Brand ink | `brand-ink` | `#1B1B1B` | `#1B1B1B` | Text on large orange surfaces (5.25:1). Unlike `foreground`, it stays dark in dark mode. Large text may use white on orange (3.3:1, large only). |
+| Attention | `attention` / `attention-foreground` | `#F9D3C0` | `#F9D3C0` | A soft peach panel for a block that deserves more notice (the sidebar's overdue alert, an overdue follow-up). It is the brand orange's own hue (48°) as a pastel, so it sits in the orange family and stays clean beside the cool grey canvas. It stays light in both themes: 13.5:1 against the dark canvas, 2.4:1 against `primary`, a gentle 1.4:1 tint on a white card. Text on it is `attention-foreground` ink (12.4:1); secondary lines use `text-attention-foreground/70` (5.4:1). Never `muted-foreground` or orange text (2.4:1) on it. Use one attention panel per screen at most. |
 | Quiet fill | `secondary` | `#E6E8F1` | `#313131` | Inactive pills, icon chips, segmented controls |
 | Lines | `border` / `input` | `#E6E8F1` / `#C6C6C8` | white 10% / 15% | Hairlines; `input` is a 50% fill behind fields |
 
@@ -72,6 +73,15 @@ These follow the munim frontend's layout rules (`~/projects/munim_frontend/DESIG
 - There is one shadow, `shadow-card`, and only top-level panels get it (cards, header, sidebar, drawer). Nested blocks, rows and buttons stay flat.
 - Containers have no outline borders. Surface colour separates them.
 
+### Dashboard frame (`/dashboard`)
+
+The dashboard follows its claude.ai/design file and is the one place with its own spacing and radii:
+
+- The whole screen is one `bg-card` frame (`h-dvh rounded-[44px] p-2.5`) inset 8px into a black backdrop (`p-2`, a thin bezel), so all four corners show like a rounded device screen. The page never scrolls: panels fill the frame and their lists scroll inside them (flexible panels keep a 220px minimum; on very short screens the content column beside the rail scrolls instead). Its panels sit **10px** apart (`gap-2.5`), not 6px.
+- Radii: frame 44px, dark rail 38px, panels `rounded-xl` (32px), attention blocks 28px, tiles and bars 20px, rows `rounded-md` (18px).
+- Controls sit in **notches**: card-coloured cut-outs in a panel's corner with 36px fillets (`components/notch.tsx`). The sheet and dialog cut their top-right corner for a 48px close button.
+- Hero panels and the rail are `.dark` in both themes.
+
 ### Auth page (`/auth`)
 
 - **Layout:** the form column is on the left: wordmark, the Log in / Register pill, a left-aligned two-tone title, the form, then the account-switch line. On the right is a photo panel with LeadFlow's own cards floating over it (example data), The panel is hidden below `lg`, where the theme toggle moves into the form header.
@@ -101,8 +111,29 @@ The sidebar keeps the stock shadcn animations (`duration-200 ease-linear`) uncha
 
 Use 150–250 ms on state changes: hover, the active pill, the dialog opening, and a mode switch. Every animation ships with a `prefers-reduced-motion` variant that keeps opacity changes and drops movement.
 
+- **Library:** GSAP (`gsap` + `@gsap/react`) for JS-driven motion. Exception: full-screen effects that must stay smooth while the page is busy (the theme wipe) use native animations. Use `useGSAP()` with a `scope` ref (never `useEffect`), and wrap every animation in `gsap.matchMedia()` with a `prefers-reduced-motion: reduce` branch that keeps only opacity. Simple hover and state changes stay in CSS.
+- **View change (dashboard): morph first, fade last.** Whatever two views share morphs instead of fading:
+  - `data-flip-id`: an element present on both sides of a switch moves and resizes into its new place with GSAP Flip (0.55s `power3.inOut`). The dark hero and its corner notches always morph, so the black shape stays on screen and shapeshifts; so do the sidebar toggle, title pill, theme/add/bell buttons, the big number, the callouts, the attention notch (which moves between corners), the leads card and each lead row. The ids each view renders are listed in `VIEW_FLIP` in `app/dashboard/page.tsx`; keep it in sync with the markup.
+  - `data-roll`: text that changes rolls behind a mask (old text slides up out of its box, new text rises into its own box from below, 0.45s). Used for the title and subtitle, the hero heading, the big number and callout values/labels.
+  - Only what one side has and the other doesn't fades or slides: panels slide toward the edge nearest to them, small details fade, and `data-swap` marks blocks inside a morphing panel whose contents differ (the leads card's notch).
+  - Order: *out* (0.25s) runs before React swaps the view, then *in*. Clicks during the exit are ignored. Reduced motion swaps instantly and fades the new panels in.
+- **Rail:** opening and closing glides the width (76 ↔ 220px) while the labels fade; the active tab is a single pill that slides to the clicked row immediately.
 - **Curves:** the `ease-out` and `ease-in-out` utilities use stronger curves, set in `app/globals.css`: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` for things entering and leaving, and `--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1)` for things moving on screen. Never use `ease-in`.
 - **Animated properties:** only transform, opacity and clip-path. The one exception is collapsing a section, which uses grid rows.
 - **Segmented toggle:** the active pill is a styled copy of the labels clipped to the active half. The clip slides (250ms ease-in-out), so the fill and the text colour change together. See `/auth`.
+- **Dropdowns** use the shadcn Select (`components/ui/select.tsx`), never a native `<select>`. The list opens below its trigger and scales in from it (0.95 → 1, fading, 150ms ease-out) and leaves the same way. The chevron flips while it's open. Items are `rounded-control` pills. Reduced motion turns the animation off.
+- **Date and time** use `components/date-time-picker.tsx`, never native date or time inputs.
+  - It has two steps: the shadcn calendar, with past days disabled, then a clock dial.
+  - The steps slide in from their side (200ms ease-out).
+  - The dial hand turns to each pick (200ms ease-out), but follows a drag directly. The numbers crossfade when switching between hours and minutes.
+  - The hour and minute boxes take typing, and the dial is a keyboard slider.
+  - Selected parts use `bg-primary/12 text-primary`.
+- **Toasts** come in four kinds and are coloured by kind (Sonner `richColors`):
+  - `success`: a confirmed save.
+  - `warning`: an invalid or wrong action, whether caught before sending or rejected by the server (400, 409, 418, 422).
+  - `error`: a real failure (offline, signed out, server error).
+  - `info`: neutral notices.
+  - Show API failures through `toastFailure()` in `lib/api.ts`, which picks the kind from the HTTP status.
 - **Swapping text** (titles, button labels): both versions sit in one grid cell and crossfade with a 4px rise (200ms ease-out). The hidden one is `inert`.
+- **Theme change:** the new theme wipes in from the left edge over 700ms. The curve is logarithmic, y = ln(1 + 15t) / ln(16), sampled into CSS `linear()`: it leaves the edge fast and settles slowly. It is a native Web Animation on the view-transition snapshot, **not GSAP**: a GSAP tween runs on the main thread and stutters while the app re-renders for the new theme. Persisting the choice (next-themes `setTheme`) waits until the wipe ends. Both the toggle button and the `d` key go through `useThemeToggle()` (`components/theme-provider.tsx`); `app/globals.css` only turns off the default crossfade. With reduced motion, or in a browser without view transitions, the theme switches instantly.
 - **Fields or rows that appear or disappear:** grid rows 0fr→1fr plus opacity over 400ms on `ease-drawer` (`cubic-bezier(0.32, 0.72, 0, 1)`), a long settling glide, so a card changing size feels calm rather than snappy. Collapsed inputs are `disabled`, so they skip validation.

@@ -3,11 +3,11 @@
 import * as React from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { EyeClosedIcon, EyeIcon, RouteIcon } from "lucide-react"
+import { EyeClosedIcon, EyeIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
-import { describeApiError, OFFLINE, refreshCsrf } from "@/lib/api"
+import { ApiFailure, OFFLINE, refreshCsrf, toastFailure } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -44,11 +44,17 @@ const COPY = {
 
 function Logo() {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-        <RouteIcon className="size-4" />
+    <div className="flex items-center gap-3">
+      <span className="grid size-13 flex-none place-items-center rounded-full bg-primary">
+        <span className="flex items-end gap-[3px]">
+          <span className="h-2.5 w-1.5 rounded-[3px] bg-primary-foreground/60" />
+          <span className="h-4 w-1.5 rounded-[3px] bg-primary-foreground/80" />
+          <span className="h-[22px] w-1.5 rounded-[3px] bg-primary-foreground" />
+        </span>
       </span>
-      <span className="text-lg font-medium">LeadFlow</span>
+      <span className="text-[22px] font-medium tracking-[-0.01em]">
+        LeadFlow
+      </span>
     </div>
   )
 }
@@ -63,7 +69,7 @@ function Field({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-2 pb-4">
+    <div className="flex flex-col gap-2 pb-[18px]">
       <Label htmlFor={id}>{label}</Label>
       {children}
     </div>
@@ -73,7 +79,7 @@ function Field({
 // Autofill: paint the field colour over Chrome's autofill fill so saved
 // emails and passwords don't turn the field yellow or olive.
 const FIELD =
-  "h-11 px-4 md:text-base autofill:shadow-[inset_0_0_0_1000px_color-mix(in_oklch,var(--input)_50%,var(--card))] autofill:[-webkit-text-fill-color:var(--foreground)]"
+  "h-14 rounded-full px-[22px] text-base md:text-base autofill:shadow-[inset_0_0_0_1000px_color-mix(in_oklch,var(--input)_50%,var(--card))] autofill:[-webkit-text-fill-color:var(--foreground)]"
 
 function PasswordInput({
   id,
@@ -103,7 +109,7 @@ function PasswordInput({
         minLength={minLength}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        className={`${FIELD} pr-12`}
+        className={`${FIELD} pr-14`}
       />
       {/* Open eye = the password is hidden and can be shown; closed eye =
           it is visible and can be hidden. The icon swaps instantly: no
@@ -111,12 +117,12 @@ function PasswordInput({
       <Button
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         aria-pressed={visible}
         aria-label={visible ? "Hide password" : "Show password"}
         title={visible ? "Hide password" : "Show password"}
         onClick={() => setVisible((v) => !v)}
-        className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground transition-none hover:text-foreground active:not-aria-[haspopup]:translate-y-[-50%]"
+        className="absolute top-1/2 right-2 size-10 -translate-y-1/2 rounded-full text-muted-foreground transition-none hover:text-foreground active:not-aria-[haspopup]:translate-y-[-50%]"
       >
         {visible ? <EyeClosedIcon /> : <EyeIcon />}
       </Button>
@@ -223,37 +229,37 @@ function ProductCards() {
           per follow-up, then today's agenda. The smoky 40% tint keeps small
           white text readable over the bright windows behind it. */}
       <div
-        className={`absolute top-8 right-20 left-8 flex flex-col gap-3 rounded-lg glass p-4 ${RISE} delay-300`}
+        className={`absolute top-6 right-24 left-6 flex max-w-[520px] flex-col gap-3.5 rounded-[28px] glass px-5 pt-5 pb-4 ${RISE} delay-300`}
       >
-        <div className="flex items-baseline justify-between px-1">
-          <span className="text-sm font-medium">October 2026</span>
-          <span className="text-xs text-white/90">
+        <div className="flex items-baseline justify-between gap-3 px-1.5">
+          <span className="text-[17px] font-medium">October 2026</span>
+          <span className="text-[13px] text-white/90">
             {WEEK_TOTAL} follow-ups this week
           </span>
         </div>
 
-        <div className="grid grid-cols-7 text-center">
+        <div className="grid grid-cols-7 gap-1 text-center">
           {WEEK.map(([day, date, count]) => {
             const today = date === TODAY
             return (
-              <div key={date} className="flex flex-col items-center gap-1">
+              <div key={date} className="flex flex-col items-center gap-1.5">
                 <span className="text-xs text-white/90">{day}</span>
                 <span
                   className={cn(
-                    "flex size-9 items-center justify-center rounded-full text-lg font-light tabular-nums",
+                    "grid size-11 place-items-center rounded-full text-2xl font-light tabular-nums",
                     today && "bg-primary text-primary-foreground"
                   )}
                 >
                   {date}
                 </span>
                 {/* One dot per follow-up, up to three. */}
-                <span className="flex h-1.5 gap-0.5">
+                <span className="flex h-1.5 gap-[3px]">
                   {Array.from({ length: Math.min(count, 3) }, (_, i) => (
                     <span
                       key={i}
                       className={cn(
-                        "size-1.5 rounded-full",
-                        today ? "bg-primary" : "bg-white/70"
+                        "size-[5px] rounded-full",
+                        today ? "bg-primary" : "bg-white"
                       )}
                     />
                   ))}
@@ -270,17 +276,20 @@ function ProductCards() {
             <div
               key={item.name}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-xs",
+                "flex items-center gap-4 rounded-full px-4 py-2.5 text-sm",
                 i === 0
-                  ? "bg-brand-surface text-brand-ink"
-                  : "bg-white/10 text-white"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-white/14 text-white"
               )}
             >
-              <span className="w-14 shrink-0 tabular-nums">{item.time}</span>
+              <span className="w-16 flex-none tabular-nums">{item.time}</span>
               <span className="min-w-0 flex-1 truncate font-medium">
                 {i === 0 ? `Follow up with ${item.name}` : item.name}
               </span>
-              <span className={i === 0 ? "" : "text-white/90"}>
+              <span className="flex flex-none items-center gap-1.5">
+                {i > 0 && (
+                  <span className="size-2 rounded-full bg-status-qualified" />
+                )}
                 {item.status}
               </span>
             </div>
@@ -288,52 +297,80 @@ function ProductCards() {
         </div>
       </div>
 
-      {/* Today's follow-ups: follows the page theme like the real app. One
-          row (text left, avatars right) so it stays low, on the table. */}
-      <div
-        className={`absolute bottom-6 left-8 flex w-80 items-center justify-between gap-4 rounded-md bg-card px-5 py-3 text-card-foreground ${RISE} delay-500`}
-      >
-        <span className="text-sm leading-tight font-medium">
-          Today&apos;s Follow-ups
-          <span className="block text-xs font-normal text-muted-foreground">
-            3 scheduled · Example data
-          </span>
-        </span>
-        <div className="flex shrink-0">
-          {TODAY_LEADS.map((lead) => (
-            <span
-              key={lead.initials}
-              className="relative -ml-2 flex size-9 items-center justify-center rounded-full bg-secondary text-xs font-medium ring-2 ring-card first:ml-0"
-            >
-              {lead.initials}
-              <span
-                className={`absolute right-0 bottom-0 size-2.5 rounded-full ring-2 ring-card ${lead.dot}`}
-              />
+      {/* Today's follow-ups, in the photo's bottom-left notch. Follows the
+          page theme like the real app. */}
+      <EdgeNotch corner="bl" className="max-w-[calc(100%-60px)]">
+        <div
+          className={`flex items-center gap-6 rounded-[28px] bg-background py-4 pr-4 pl-[22px] ${RISE} delay-500`}
+        >
+          <span className="flex min-w-0 flex-col gap-0.5 whitespace-nowrap">
+            <span className="text-base font-medium">
+              Today&apos;s Follow-ups
             </span>
-          ))}
+            <span className="text-[13px] text-muted-foreground">
+              3 scheduled · Example data
+            </span>
+          </span>
+          <div className="flex flex-none">
+            {TODAY_LEADS.map((lead) => (
+              <span
+                key={lead.initials}
+                className="relative -ml-2 grid size-11 place-items-center rounded-full bg-card text-[13px] font-medium shadow-[0_0_0_3px_var(--background)] first:ml-0"
+              >
+                {lead.initials}
+                <span
+                  className={`absolute right-0 bottom-0 size-2.5 rounded-full shadow-[0_0_0_2px_var(--background)] ${lead.dot}`}
+                />
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      </EdgeNotch>
     </div>
   )
 }
 
-/** The theme toggle sits in a notch cut out of the photo's top-right corner.
- *  The notch is the card colour; two radial-gradient fillets curve the photo
- *  edge into it. Its padding is the panel gap (6px), so the button sits the
- *  same distance from the photo as from the card's outer edge; the 28px
- *  corner is concentric with the 22px button radius. */
-function CornerToggle() {
-  // Each fillet: photo inside the arc, a 2px orange band on the arc (the
-  // photo's edge line continuing round the curve), card outside it.
-  const fillet =
-    "pointer-events-none absolute size-6 bg-[radial-gradient(circle_at_0_100%,transparent_calc(1.5rem-2px),var(--photo-edge)_calc(1.5rem-2px),var(--photo-edge)_1.5rem,var(--card)_calc(1.5rem+0.5px))]"
-  return (
-    // The offset outer shadow draws the same 2px line along the notch's
-    // left edge, its curved corner and its bottom edge, on the photo side.
-    <div className="absolute top-0 right-0 z-10 rounded-bl-[1.75rem] bg-card pb-panel pl-panel shadow-[-2px_2px_0_0_var(--photo-edge)] [&_button]:size-11 [&_svg]:size-5">
+/** A card-coloured cut-out in the photo's corner (36px inner radius, 10px
+ *  padding, as on the dashboard). The photo's orange edge line continues
+ *  round it: an offset shadow along the notch's two inner edges, and a 2px
+ *  band on each fillet's arc (photo inside, card outside). */
+function EdgeNotch({
+  corner,
+  className,
+  children,
+}: {
+  corner: "tr" | "bl"
+  className?: string
+  children: React.ReactNode
+}) {
+  // Written out in full so Tailwind can find both classes.
+  const fillet = cn(
+    "pointer-events-none absolute size-9",
+    corner === "tr"
+      ? "bg-[radial-gradient(circle_at_0_100%,transparent_calc(2.25rem-2px),var(--photo-edge)_calc(2.25rem-2px),var(--photo-edge)_2.25rem,var(--card)_calc(2.25rem+0.5px))]"
+      : "bg-[radial-gradient(circle_at_100%_0,transparent_calc(2.25rem-2px),var(--photo-edge)_calc(2.25rem-2px),var(--photo-edge)_2.25rem,var(--card)_calc(2.25rem+0.5px))]"
+  )
+  return corner === "tr" ? (
+    <div
+      className={cn(
+        "absolute top-0 right-0 z-10 rounded-bl-[2.25rem] bg-card pb-2.5 pl-2.5 shadow-[-2px_2px_0_0_var(--photo-edge)]",
+        className
+      )}
+    >
       <span aria-hidden className={`${fillet} top-0 right-full`} />
       <span aria-hidden className={`${fillet} top-full right-0`} />
-      <ModeToggle />
+      {children}
+    </div>
+  ) : (
+    <div
+      className={cn(
+        "absolute bottom-0 left-0 z-10 rounded-tr-[2.25rem] bg-card pt-2.5 pr-2.5 shadow-[2px_-2px_0_0_var(--photo-edge)]",
+        className
+      )}
+    >
+      <span aria-hidden className={`${fillet} bottom-full left-0`} />
+      <span aria-hidden className={`${fillet} bottom-0 left-full`} />
+      {children}
     </div>
   )
 }
@@ -374,7 +411,7 @@ export default function AuthPage() {
 
     if (isRegister && password !== String(form.get("confirm") ?? "")) {
       setMismatch(true)
-      toast.error(
+      toast.warning(
         "Those two passwords do not match. Retype them and try again."
       )
       confirmRef.current?.focus()
@@ -385,7 +422,7 @@ export default function AuthPage() {
     const id = toast.loading(copy.pending)
 
     try {
-      const { error } = isRegister
+      const { error, response } = isRegister
         ? await postCoreRegister({
             body: {
               name: String(form.get("name") ?? "").trim(),
@@ -396,7 +433,7 @@ export default function AuthPage() {
         : await postCoreLogin({ body: { email, password } })
 
       if (error) {
-        toast.error(describeApiError(error), { id })
+        toastFailure(new ApiFailure(error, response?.status), { id })
         return
       }
       refreshCsrf()
@@ -412,9 +449,9 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-6">
-      <div className="grid w-full max-w-6xl grid-cols-1 gap-panel rounded-xl bg-card p-panel shadow-card lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <section className="flex min-w-0 flex-col gap-8 p-6 sm:p-10">
+    <main className="flex min-h-svh items-center justify-center bg-background p-4 sm:p-7">
+      <div className="grid w-full max-w-[1200px] grid-cols-1 gap-2.5 rounded-[44px] bg-card p-2.5 shadow-card lg:grid-cols-2">
+        <section className="flex min-w-0 flex-col justify-center gap-8 px-6 py-8 sm:px-12 sm:py-11">
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* Logo left. On desktop the theme toggle lives in the photo's
                 corner notch; below lg (no photo) it sits here. */}
@@ -427,7 +464,7 @@ export default function AuthPage() {
             <div
               role="group"
               aria-label="Choose log in or register"
-              className="relative grid w-fit grid-cols-2 rounded-full bg-secondary p-1 ring-ring/50 has-focus-visible:ring-3"
+              className="relative grid w-fit grid-cols-2 rounded-full bg-background p-[5px] ring-ring/50 has-focus-visible:ring-3"
             >
               {MODES.map((value) => (
                 <button
@@ -435,7 +472,7 @@ export default function AuthPage() {
                   type="button"
                   aria-pressed={mode === value}
                   onClick={() => switchMode(value)}
-                  className="rounded-control px-4 py-1.5 text-sm font-medium outline-none"
+                  className="h-11 rounded-control px-[22px] text-[15px] font-medium outline-none"
                 >
                   {value === "login" ? "Log in" : "Register"}
                 </button>
@@ -445,24 +482,26 @@ export default function AuthPage() {
                   one motion. */}
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-1 grid grid-cols-2 rounded-control bg-primary text-sm font-medium text-primary-foreground transition-[clip-path] duration-250 ease-in-out motion-reduce:transition-none"
+                className="pointer-events-none absolute inset-[5px] grid grid-cols-2 rounded-control bg-primary text-[15px] font-medium text-primary-foreground transition-[clip-path] duration-250 ease-in-out motion-reduce:transition-none"
                 style={{
                   clipPath: isRegister
                     ? "inset(0 0 0 50% round 9999px)"
                     : "inset(0 50% 0 0 round 9999px)",
                 }}
               >
-                <span className="flex items-center justify-center px-4">
+                <span className="flex items-center justify-center px-[22px]">
                   Log in
                 </span>
-                <span className="flex items-center justify-center px-4">
+                <span className="flex items-center justify-center px-[22px]">
                   Register
                 </span>
               </div>
             </div>
           </div>
 
-          <h2 className={`text-2xl leading-tight font-light ${RISE} delay-75`}>
+          <h1
+            className={`text-[34px] leading-[1.2] font-light tracking-[-0.01em] ${RISE} delay-75`}
+          >
             <Crossfade
               mode={mode}
               render={(m) => (
@@ -474,7 +513,7 @@ export default function AuthPage() {
                 </>
               )}
             />
-          </h2>
+          </h1>
 
           <form
             onSubmit={onSubmit}
@@ -527,7 +566,7 @@ export default function AuthPage() {
               type="submit"
               size="lg"
               disabled={pending}
-              className="mt-2 h-11 w-full"
+              className="mt-2 h-14 w-full rounded-full text-base"
             >
               {pending ? (
                 "Working…"
@@ -537,18 +576,21 @@ export default function AuthPage() {
             </Button>
           </form>
 
-          <p className={`text-sm text-muted-foreground ${RISE} delay-200`}>
+          <p
+            className={`pt-2 text-[15px] text-muted-foreground ${RISE} delay-200`}
+          >
             <Crossfade
               mode={mode}
+              className="justify-items-center"
               render={(m) => (
-                <span>
-                  {COPY[m].switchPrompt}{" "}
+                <span className="flex flex-wrap justify-center gap-x-2.5 gap-y-1">
+                  {COPY[m].switchPrompt}
                   <button
                     type="button"
                     onClick={() =>
                       switchMode(m === "register" ? "login" : "register")
                     }
-                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                    className="font-medium text-foreground transition-colors hover:text-highlight"
                   >
                     {COPY[m].switchAction}
                   </button>
@@ -560,7 +602,7 @@ export default function AuthPage() {
 
         {/* Picture panel: the team photo with LeadFlow's own cards
             floating over it, and the theme toggle in the cut-out corner. */}
-        <section className="relative hidden overflow-hidden rounded-lg bg-muted [--photo-edge:color-mix(in_oklch,var(--primary)_55%,var(--card))] lg:block">
+        <section className="relative hidden min-h-[640px] overflow-hidden rounded-[32px] bg-muted [--photo-edge:color-mix(in_oklch,var(--primary)_55%,var(--card))] lg:block">
           <Image
             src={teamPhoto}
             alt="A small team talking around a meeting table with a laptop, coffee and notes"
@@ -579,7 +621,12 @@ export default function AuthPage() {
             aria-hidden
             className="pointer-events-none absolute inset-0 rounded-[inherit] ring-2 ring-(--photo-edge) ring-inset"
           />
-          <CornerToggle />
+          <EdgeNotch
+            corner="tr"
+            className="[&_button]:size-16 [&_button]:bg-background [&_svg]:size-5"
+          >
+            <ModeToggle />
+          </EdgeNotch>
         </section>
       </div>
     </main>
