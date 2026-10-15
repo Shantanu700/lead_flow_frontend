@@ -15,6 +15,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Plus,
   Search,
   Sun,
@@ -157,6 +158,17 @@ export default function Page() {
   // Each lead's discussions, newest first, fetched when its sheet opens.
   const [talk, setTalk] = React.useState<Record<number, Discussion[]>>({})
   const [saving, setSaving] = React.useState(false)
+  // Editing the open lead's details in its sheet.
+  const [editing, setEditing] = React.useState(false)
+  const [draft, setDraft] = React.useState(BLANK_DRAFT)
+  // "✓ Saved" beside Edit for a moment after a successful edit.
+  const [saved, setSaved] = React.useState(false)
+  const savedTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
+  const flashSaved = () => {
+    clearTimeout(savedTimer.current)
+    setSaved(true)
+    savedTimer.current = setTimeout(() => setSaved(false), 1500)
+  }
   const [period, setPeriod] = React.useState<Period>("Month")
   const [mode, setMode] = React.useState<"Count" | "Value">("Count")
 
@@ -826,7 +838,11 @@ export default function Page() {
   const compact = cw < 1154
   const odW = cw < 914 ? 290 : 330
   const bigSize = cw < 914 ? 60 : cw < 1254 ? 72 : 84
-  const heroH = narrow ? 740 : compact ? 600 : 540
+  const heroH = narrow ? 780 : compact ? 600 : 540
+  // Stacked layouts scroll the content column, so their rows take their
+  // content's full height (max-content); `auto` rows in this fixed-height
+  // grid would shrink and let panels overlap.
+  const stackedRows = (n: number) => Array(n).fill("max-content").join(" ")
   const subVisible = cw >= 1000
   const pageStyle: React.CSSProperties = { gridColumn: "1 / -1" }
 
@@ -919,7 +935,52 @@ export default function Page() {
     setOverdue(swap)
     setUpcoming(swap)
   }
+  const startEdit = () => {
+    if (!selLead) return
+    setDraft({
+      name: selLead.name,
+      company: selLead.company ?? "",
+      phone: selLead.phone ?? "",
+      value: String(selLead.value ?? 0),
+      source: selLead.source ?? "",
+    })
+    setEditing(true)
+  }
+  // Sends only what changed; the sheet and lists update from the server's
+  // answer. On failure the form stays open with the edits.
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selLead || !draft.name.trim() || saving) return
+    const next = {
+      name: draft.name.trim(),
+      company: draft.company.trim(),
+      phone: draft.phone.trim(),
+      value: Math.max(0, Math.round(Number(draft.value) || 0)),
+      source: draft.source,
+    }
+    const body = Object.fromEntries(
+      Object.entries(next).filter(
+        ([k, v]) =>
+          v !== (selLead[k as keyof typeof next] ?? (k === "value" ? 0 : ""))
+      )
+    )
+    if (!Object.keys(body).length) return setEditing(false)
+    setSaving(true)
+    try {
+      await got(putApiLead({ path: { id: selLead.id }, body }), merge)
+      setEditing(false)
+      flashSaved()
+      toast.success("Lead updated.")
+      refresh()
+    } catch (error) {
+      toast.error(describeApiError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
   const openLead = (id: number) => {
+    setEditing(false)
+    setSaved(false)
     setSelLead(
       [...list.results, ...today, ...overdue, ...upcoming].find(
         (l) => l.id === id
@@ -1323,10 +1384,10 @@ export default function Page() {
             gridTemplateRows:
               view === 0
                 ? compact
-                  ? "auto auto auto"
+                  ? stackedRows(3)
                   : "auto minmax(220px,1fr)"
                 : view === 3 && compact
-                  ? "auto"
+                  ? stackedRows(1)
                   : "1fr",
           }}
         >
@@ -1509,7 +1570,11 @@ export default function Page() {
                       }
                 }
               >
-                <section className="flex min-h-0 flex-[1_1_300px] flex-col gap-[18px] rounded-xl bg-background p-6">
+                <section
+                  className="flex min-h-0 flex-[1_1_300px] flex-col gap-[18px] rounded-xl bg-background p-6"
+                  // Stacked, the list still shows a few follow-ups.
+                  style={compact ? { minHeight: 320 } : undefined}
+                >
                   <div className="flex items-start justify-between">
                     <Title title="Today's" sub="Follow-ups" />
                     <div className="flex items-baseline gap-1.5">
@@ -2003,7 +2068,7 @@ export default function Page() {
                   ? "minmax(0,1fr)"
                   : "minmax(0,1.4fr) minmax(0,1fr)",
                 gridTemplateRows: compact
-                  ? undefined
+                  ? stackedRows(3)
                   : "auto minmax(220px,1fr)",
               }}
             >
@@ -2021,7 +2086,14 @@ export default function Page() {
                       compact ? "flex-col" : "flex-row"
                     )}
                   >
-                    <div className="flex flex-none flex-col gap-6">
+                    <div
+                      className={cn(
+                        "flex flex-none gap-6",
+                        compact && !narrow
+                          ? "flex-row flex-wrap items-end justify-between"
+                          : "flex-col"
+                      )}
+                    >
                       <div className="flex flex-col gap-3.5">
                         <h1
                           data-roll="h1"
@@ -2245,11 +2317,121 @@ export default function Page() {
           <CloseButton onClick={() => setSheet(false)} />
           <SheetHeader>
             <SheetTitle>{selLead?.name}</SheetTitle>
-            <SheetDescription>
-              {[selLead?.company, selLead?.phone, money(selLead?.value ?? 0)]
-                .filter(Boolean)
-                .join(" · ")}
-            </SheetDescription>
+            {editing ? (
+              <form onSubmit={saveEdit} className="flex flex-col gap-3 pt-2">
+                <SheetDescription className="sr-only">
+                  Edit this lead&apos;s details.
+                </SheetDescription>
+                {(
+                  [
+                    ["name", "Full name", "text"],
+                    ["company", "Company", "text"],
+                    ["phone", "Phone", "tel"],
+                    ["value", "Estimated value (₹)", "number"],
+                  ] as const
+                ).map(([key, label, type], i) => (
+                  <div
+                    key={key}
+                    className={cn("flex flex-col gap-1.5", CASCADE)}
+                    style={{ animationDelay: i * 30 + "ms" }}
+                  >
+                    <Label htmlFor={"edit-" + key}>{label}</Label>
+                    <Input
+                      id={"edit-" + key}
+                      type={type}
+                      required={key === "name"}
+                      {...(key === "value" && {
+                        min: 0,
+                        step: 1,
+                        inputMode: "numeric" as const,
+                      })}
+                      value={draft[key]}
+                      onChange={(e) =>
+                        setDraft({ ...draft, [key]: e.target.value })
+                      }
+                    />
+                  </div>
+                ))}
+                <div
+                  className={cn("flex flex-col gap-1.5", CASCADE)}
+                  style={{ animationDelay: "120ms" }}
+                >
+                  <Label htmlFor="edit-source">Source</Label>
+                  <select
+                    id="edit-source"
+                    value={draft.source}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        source: e.target.value as SourceEnum,
+                      })
+                    }
+                    className={SELECT_CLASS}
+                  >
+                    <option value="">Not recorded</option>
+                    {SOURCE_OPTIONS.map((o) => (
+                      <option key={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+                <div
+                  className={cn("flex gap-2 pt-1", CASCADE)}
+                  style={{ animationDelay: "150ms" }}
+                >
+                  <Button
+                    type="submit"
+                    disabled={!draft.name.trim() || saving}
+                    className="flex-1"
+                  >
+                    {saving ? "Saving…" : "Save changes"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex animate-in flex-wrap items-center justify-between gap-2 duration-200 fade-in-0 motion-reduce:animate-none">
+                <SheetDescription>
+                  {[
+                    selLead?.company,
+                    selLead?.phone,
+                    selLead?.source,
+                    money(selLead?.value ?? 0),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </SheetDescription>
+                <span className="flex items-center gap-2">
+                  <span
+                    aria-live="polite"
+                    className={cn(
+                      "flex items-center gap-1 text-xs text-muted-foreground transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none",
+                      saved ? "opacity-100" : "translate-x-1 opacity-0"
+                    )}
+                  >
+                    {saved && (
+                      <>
+                        <Check size={12} strokeWidth={2} />
+                        Saved
+                      </>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={startEdit}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition-[background-color,transform] duration-150 ease-out hover:bg-secondary active:scale-[0.97] motion-reduce:active:scale-100"
+                  >
+                    <Pencil size={12} strokeWidth={1.75} />
+                    Edit
+                  </button>
+                </span>
+              </div>
+            )}
           </SheetHeader>
           <div
             role="group"
@@ -2399,7 +2581,7 @@ export default function Page() {
                   onChange={(e) =>
                     setForm({ ...form, source: e.target.value as SourceEnum })
                   }
-                  className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                  className={SELECT_CLASS}
                 >
                   <option value="">Not recorded</option>
                   {SOURCE_OPTIONS.map((o) => (
@@ -2931,6 +3113,19 @@ const EMPTY_REPORT: ReportsStats = {
   funnel: STAGES.map(([status]) => ({ status, count: 0, value: 0 })),
   leads: 0,
   sources: [],
+}
+// Edit-form rows fade and drop in one after another (delay set per row).
+const CASCADE =
+  "animate-in fill-mode-both duration-200 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none"
+// Native <select> styled like the Input component.
+const SELECT_CLASS =
+  "h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+const BLANK_DRAFT = {
+  name: "",
+  company: "",
+  phone: "",
+  value: "",
+  source: "" as SourceEnum | "",
 }
 const SOURCE_OPTIONS: SourceEnum[] = [
   "Website form",
