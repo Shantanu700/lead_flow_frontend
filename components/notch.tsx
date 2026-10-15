@@ -7,25 +7,28 @@ const R = 36
 
 type Corner = "tl" | "tr" | "br" | "bl" | "b"
 
-const fillet = (at: string) =>
+const fillet = (at: string, R: number) =>
   `radial-gradient(circle at ${at}, transparent ${R - 0.5}px, var(--card) ${R}px)`
 
 // Each corner: the block's position, padding and rounded inner corner, plus
 // two fillets that curve the panel's edge into the notch.
-const corners: Record<
+const corners = (
+  R: number,
+  G: number
+): Record<
   Corner,
   {
     box: React.CSSProperties
     // [position, gradient centre, role while the notch changes corner]
     fillets: [React.CSSProperties, string, role?: "edge" | "fly"][]
   }
-> = {
+> => ({
   tl: {
     box: {
       top: 0,
       left: 0,
       borderBottomRightRadius: R,
-      padding: "0 10px 10px 0",
+      padding: `0 ${G}px ${G}px 0`,
     },
     fillets: [
       [{ top: 0, right: -R }, "100% 100%"],
@@ -37,7 +40,7 @@ const corners: Record<
       top: 0,
       right: 0,
       borderBottomLeftRadius: R,
-      padding: "0 0 10px 10px",
+      padding: `0 0 ${G}px ${G}px`,
     },
     fillets: [
       [{ top: 0, left: -R }, "0 100%"],
@@ -49,7 +52,7 @@ const corners: Record<
       bottom: 0,
       right: 0,
       borderTopLeftRadius: R,
-      padding: "10px 0 0 10px",
+      padding: `${G}px 0 0 ${G}px`,
     },
     fillets: [
       [{ right: 0, top: -R }, "0 0", "edge"],
@@ -64,7 +67,7 @@ const corners: Record<
       bottom: 0,
       left: 0,
       borderTopRightRadius: R,
-      padding: "10px 10px 0 0",
+      padding: `${G}px ${G}px 0 0`,
     },
     fillets: [
       [{ left: 0, top: -R }, "100% 0", "edge"],
@@ -81,31 +84,37 @@ const corners: Record<
       transform: "translateX(-50%)",
       borderTopLeftRadius: R,
       borderTopRightRadius: R,
-      padding: "10px 10px 0",
+      padding: `${G}px ${G}px 0`,
     },
     fillets: [
       [{ bottom: 0, left: -R }, "0 0"],
       [{ bottom: 0, right: -R }, "100% 0"],
     ],
   },
-}
+})
 
 /** A card-coloured cut-out in a panel's corner that holds controls. */
 export { R as NOTCH_R }
 
 export function Notch({
   corner,
+  r = R,
+  gap = 10,
   className,
   style,
   children,
   ...rest
 }: {
   corner: Corner
+  /** Inner corner radius; smaller for small cards (the drawer's notes). */
+  r?: number
+  /** Space between the panel and what the notch holds. */
+  gap?: number
   className?: string
   style?: React.CSSProperties
   children: React.ReactNode
 } & React.HTMLAttributes<HTMLDivElement>) {
-  const { box, fillets } = corners[corner]
+  const { box, fillets } = corners(r, gap)[corner]
   return (
     <div
       data-notch={corner}
@@ -125,7 +134,7 @@ export function Notch({
             // would otherwise widen the scroll area.
             role === "fly" && "hidden"
           )}
-          style={{ ...pos, width: R, height: R, background: fillet(at) }}
+          style={{ ...pos, width: r, height: r, background: fillet(at, r) }}
         />
       ))}
     </div>
