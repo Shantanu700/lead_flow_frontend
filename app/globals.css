@@ -16,6 +16,8 @@
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
     --color-highlight: var(--highlight);
+    --color-attention: var(--attention);
+    --color-attention-foreground: var(--attention-foreground);
     --color-brand-ink: var(--brand-ink);
     --color-brand-surface: var(--brand-surface);
     --color-primary-hover: var(--primary-hover);
@@ -93,6 +95,13 @@
        towards ink, so a big area doesn't glare. #E5532F; ink on it 4.6:1. */
     --brand-surface: oklch(0.634 0.188 34.9);
     --highlight: oklch(0.669 0.202 34.8); /* #F75831 VANTA orange — dots, charts, large accents */
+    /* Attention panel: a soft peach (#F9D3C0), the brand orange's own hue as a
+       pastel, for blocks that deserve more notice. Not redefined in .dark, so it
+       stays light in both themes: 13.5:1 against the dark canvas, 2.4:1 against
+       primary, a 1.4:1 tint on white. Text on it is attention-foreground
+       (12.4:1); secondary lines use it at 70% (5.4:1). */
+    --attention: oklch(0.895 0.05 48);
+    --attention-foreground: oklch(0.222 0 0);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.932 0.012 276.1); /* #E6E8F1 */
     --input: oklch(0.827 0.003 286.3); /* #C6C6C8 */
@@ -202,4 +211,14 @@
     background-image: none;
     background-color: oklch(0.24 0 0 / 96%);
   }
+}
+
+/* ---- Theme change: the new theme wipes in from the left ----
+   useThemeToggle() wraps the switch in a view transition and animates a
+   clip-path wipe on the new snapshot (components/theme-provider.tsx). The
+   browser's default crossfade is turned off here. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
