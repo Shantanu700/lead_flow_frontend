@@ -130,6 +130,9 @@ export default function Page() {
   const railRef = React.useRef<HTMLElement>(null)
   const railMounted = React.useRef(false)
   const [w, setW] = React.useState(1400)
+  // Phones (frame under 600px): the rail becomes a bottom tab bar and every
+  // view stacks and scrolls.
+  const phone = w < 600
   const [view, setView] = React.useState(0)
   // The rail highlight follows a click at once; `view` follows after the
   // exit animation.
@@ -808,15 +811,19 @@ export default function Page() {
         `[data-nav-row="${nav}"]`
       )
       if (!row) return
-      const y = row.offsetTop
+      // Down the rail; along the tab bar on phones, as wide as a tab.
+      if (!phone) gsap.set(pillRef.current, { clearProps: "width" })
+      const to = phone
+        ? { x: row.offsetLeft, y: row.offsetTop, width: row.offsetWidth }
+        : { x: 0, y: row.offsetTop }
       if (!pillPlaced.current || reduceMotion()) {
         pillPlaced.current = true
-        gsap.set(pillRef.current, { y })
+        gsap.set(pillRef.current, to)
         return
       }
-      gsap.to(pillRef.current, { y, duration: 0.4, ease: "power3.inOut" })
+      gsap.to(pillRef.current, { ...to, duration: 0.4, ease: "power3.inOut" })
     },
-    { scope: railRef, dependencies: [nav] }
+    { scope: railRef, dependencies: [nav, phone, phone && w] }
   )
 
   // Rail open/close: the width glides between 76 and 220px while the labels
@@ -825,6 +832,13 @@ export default function Page() {
   useGSAP(
     () => {
       const labels = "[data-rail-label]"
+      // The tab bar spans the frame, icons only.
+      if (phone) {
+        gsap.set(railRef.current, { clearProps: "width" })
+        gsap.set(labels, { autoAlpha: 0 })
+        railMounted.current = false
+        return
+      }
       const to = { width: rail ? 220 : 76 }
       if (!railMounted.current) {
         railMounted.current = true
@@ -854,7 +868,7 @@ export default function Page() {
         }
       )
     },
-    { scope: railRef, dependencies: [rail] }
+    { scope: railRef, dependencies: [rail, phone] }
   )
 
   React.useEffect(() => {
@@ -866,12 +880,16 @@ export default function Page() {
   }, [])
 
   // Layout breakpoints follow the content width (frame minus rail), as in the design.
-  const cw = w - (rail ? 230 : 86)
+  const cw = phone ? w : w - (rail ? 230 : 86)
   const narrow = cw < 820
   const compact = cw < 1154
   const odW = cw < 914 ? 290 : 330
-  const bigSize = cw < 914 ? 60 : cw < 1254 ? 72 : 84
-  const heroH = narrow ? 780 : compact ? 600 : 540
+  const bigSize = phone ? 44 : cw < 914 ? 60 : cw < 1254 ? 72 : 84
+  const heroH = phone ? 700 : narrow ? 780 : compact ? 600 : 540
+  // Room above the hero's content for the top notches.
+  const heroPad = phone ? "80px 20px 24px" : "104px 36px 30px"
+  // The round buttons in the top notches.
+  const btnSize = phone ? "size-13 min-w-13" : "size-16 min-w-16"
   // Stacked layouts scroll the content column, so their rows take their
   // content's full height (max-content); `auto` rows in this fixed-height
   // grid would shrink and let panels overlap.
@@ -1243,7 +1261,11 @@ export default function Page() {
   }
 
   const railNotch = (title: string, sub?: string) => (
-    <Notch corner="tl" className="flex items-center gap-2">
+    // Phones drop it: the tab bar shows where you are.
+    <Notch
+      corner="tl"
+      className={cn("flex items-center gap-2", phone && "hidden")}
+    >
       <RoundButton
         data-flip-id="btn-rail"
         onClick={() => setRail(!rail)}
@@ -1278,7 +1300,7 @@ export default function Page() {
     </Notch>
   )
   const themeButton = (
-    <RoundButton onClick={toggleTheme} title="Toggle theme">
+    <RoundButton className={btnSize} onClick={toggleTheme} title="Toggle theme">
       <Sun {...ic} className="hidden dark:block" />
       <Moon {...ic} className="dark:hidden" />
     </RoundButton>
@@ -1296,7 +1318,10 @@ export default function Page() {
                 ? `${pending.length} follow-up${pending.length === 1 ? "" : "s"} need you`
                 : "Notifications"
             }
-            className="relative transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:active:scale-100"
+            className={cn(
+              btnSize,
+              "relative transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:active:scale-100"
+            )}
           />
         }
       >
@@ -1304,7 +1329,10 @@ export default function Page() {
         {pending.length > 0 && (
           <span
             data-bell-badge
-            className="absolute top-3 right-3 grid h-5 min-w-5 place-items-center rounded-full bg-highlight px-1 text-[11px] leading-none font-medium text-white tabular-nums shadow-[0_0_0_2px_var(--background)]"
+            className={cn(
+              "absolute grid h-5 min-w-5 place-items-center rounded-full bg-highlight px-1 text-[11px] leading-none font-medium text-white tabular-nums shadow-[0_0_0_2px_var(--background)]",
+              phone ? "top-1.5 right-1.5" : "top-3 right-3"
+            )}
           >
             {pending.length > 9 ? "9+" : pending.length}
           </span>
@@ -1367,7 +1395,7 @@ export default function Page() {
   const addButton = (
     <Button
       size="icon-lg"
-      className="size-16 min-w-16 rounded-full p-0"
+      className={cn(btnSize, "rounded-full p-0")}
       aria-label="Add lead"
       title="Add lead"
       onClick={openAdd}
@@ -1437,6 +1465,88 @@ export default function Page() {
     </span>
   )
 
+  // Reports period: in the top notch, or in the hero on phones (the notch
+  // keeps only theme and export there).
+  const periodToggle = (
+    <Segmented
+      data-flip-id="periods"
+      className={cn(phone ? "h-13 self-start bg-card p-[5px]" : "h-16 p-1.5")}
+      itemClass={cn(
+        phone ? "h-[42px] px-4" : "h-13",
+        !phone && (cw < 1014 ? "px-3" : "px-[18px]")
+      )}
+      options={PERIODS}
+      value={period}
+      onChange={pickPeriod}
+    />
+  )
+  // Leads tab: sort, search and paging.
+  const leadControls = (
+    <>
+      <Segmented
+        aria-label="Sort leads"
+        className="h-13 p-[5px]"
+        itemClass={cn("h-[42px]", phone ? "px-3" : "px-[18px]")}
+        options={["Recent", "Value", "Name"] as const}
+        value={sort}
+        onChange={(v) => {
+          captureRows()
+          setSort(v)
+          setPage(0)
+        }}
+      />
+      <div
+        className={cn(
+          "box-border flex h-13 items-center gap-2.5 rounded-full bg-background px-[18px]",
+          // In the card's own row: full width, above sort and paging.
+          narrow ? "order-first w-full" : "w-[240px]"
+        )}
+      >
+        <span className="flex text-muted-foreground">
+          <Search {...ic} />
+        </span>
+        <input
+          value={q}
+          onChange={(e) => {
+            captureRows()
+            setQ(e.target.value)
+            setPage(0)
+          }}
+          placeholder="Search leads"
+          aria-label="Search leads"
+          className="min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-0"
+        />
+      </div>
+      <div className="ml-auto box-border flex h-13 items-center rounded-full bg-background px-1">
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="icon-lg"
+            className="size-11 min-w-11 rounded-full p-0"
+            aria-label="Previous page"
+            title="Previous page"
+            disabled={page === 0}
+            onClick={() => setPage(Math.max(0, page - 1))}
+          >
+            <ArrowLeft {...sm} />
+          </Button>
+          <span className="min-w-14 text-center text-[13px] font-medium whitespace-nowrap tabular-nums">
+            {page + 1}{" "}
+            <span className="text-muted-foreground">of {pageCount}</span>
+          </span>
+          <Button
+            size="icon-lg"
+            className="size-11 min-w-11 rounded-full p-0"
+            aria-label="Next page"
+            title="Next page"
+            disabled={page >= pageCount - 1}
+            onClick={() => setPage(Math.min(pageCount - 1, page + 1))}
+          >
+            <ArrowRight {...sm} />
+          </Button>
+        </div>
+      </div>
+    </>
+  )
   const counts = dash?.by_status ?? ZERO_COUNTS
   const max = Math.max(1, ...Object.values(counts))
   const bmax = Math.max(1, ...rep.bars.map((b) => b.value))
@@ -1452,19 +1562,30 @@ export default function Page() {
     <div className="box-border h-dvh overflow-hidden bg-black p-2 text-foreground">
       <div
         ref={frameRef}
-        className="box-border flex h-full gap-2.5 overflow-hidden rounded-[44px] bg-card p-2.5"
+        className={cn(
+          "box-border flex h-full gap-2.5 overflow-hidden rounded-[44px] bg-card p-2.5",
+          phone && "flex-col-reverse"
+        )}
       >
         {/* Rail */}
         <nav
           ref={railRef}
-          className="dark relative z-5 box-border flex w-[76px] min-w-0 flex-none flex-col items-stretch gap-2 overflow-hidden rounded-[38px] bg-background p-3 text-foreground"
+          className={cn(
+            "dark relative z-5 box-border flex w-[76px] min-w-0 flex-none flex-col items-stretch gap-2 overflow-hidden rounded-[38px] bg-background p-3 text-foreground",
+            // Phones: a bottom tab bar of icons only (tabs and Log out).
+            phone &&
+              "w-auto! flex-row [&_[data-rail-label]]:hidden [&>[data-phone-hide]]:hidden [&>button]:min-w-0 [&>button]:flex-1 [&>button]:justify-center [&>button]:px-0"
+          )}
         >
           <span
             ref={pillRef}
             aria-hidden
-            className="pointer-events-none absolute top-0 right-3 left-3 h-13 rounded-full bg-foreground"
+            className={cn(
+              "pointer-events-none absolute top-0 h-13 rounded-full bg-foreground",
+              phone ? "left-0 w-13" : "right-3 left-3"
+            )}
           />
-          <div className="mb-1 flex h-13 items-center gap-3">
+          <div data-phone-hide className="mb-1 flex h-13 items-center gap-3">
             <div className="grid size-13 flex-none place-items-center rounded-full bg-card">
               <span className="flex items-end gap-[3px]">
                 <span className="h-2.5 w-1.5 rounded-[3px] bg-foreground" />
@@ -1490,11 +1611,11 @@ export default function Page() {
               <Icon {...ic} />
             </RailRow>
           ))}
-          <div className="flex-1" />
+          <div data-phone-hide className="flex-1" />
           <RailRow label="Log out" active={false} onClick={logOut}>
             <LogOut {...ic} />
           </RailRow>
-          <div className="flex items-center gap-3">
+          <div data-phone-hide className="flex items-center gap-3">
             <div className="grid size-13 flex-none place-items-center rounded-full bg-attention text-[15px] font-medium text-attention-foreground">
               {initials(user.name || user.email)}
             </div>
@@ -1524,7 +1645,7 @@ export default function Page() {
                 ? compact
                   ? stackedRows(3)
                   : "auto minmax(220px,1fr)"
-                : view === 3 && compact
+                : (view === 3 && compact) || phone
                   ? stackedRows(1)
                   : "1fr",
           }}
@@ -1533,7 +1654,7 @@ export default function Page() {
             <>
               {/* Hero */}
               <div className="relative min-w-0" style={{ minHeight: heroH }}>
-                <Hero padding="104px 36px 30px">
+                <Hero padding={heroPad}>
                   <div className="flex flex-wrap justify-between gap-6">
                     <div className="flex flex-col gap-3.5">
                       <h1
@@ -1572,7 +1693,10 @@ export default function Page() {
                   </div>
                   <div className="min-h-10 flex-1" />
                   <div
-                    className="box-content flex h-[220px] flex-none items-end gap-2"
+                    className={cn(
+                      "box-content flex h-[220px] flex-none items-end",
+                      phone ? "gap-1.5" : "gap-2"
+                    )}
                     style={{
                       paddingRight: narrow ? 0 : odW + 10,
                       paddingBottom: narrow ? 150 : 0,
@@ -1586,12 +1710,15 @@ export default function Page() {
                           key={name}
                           onClick={() => pickFilter(on ? "All" : name)}
                           aria-pressed={on}
+                          aria-label={name}
+                          title={name}
                           className="flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-end gap-2.5 border-0 bg-transparent p-0 text-left text-foreground"
                         >
                           <div
                             data-bar
                             className={cn(
-                              "box-border flex min-h-14 items-start rounded-[20px] px-3.5 py-3 transition-[opacity,background] duration-200",
+                              "box-border flex min-h-14 items-start rounded-[20px] py-3 transition-[opacity,background] duration-200",
+                              phone ? "justify-center px-1" : "px-3.5",
                               on ? "bg-foreground" : "bg-card",
                               dim && "opacity-45"
                             )}
@@ -1602,16 +1729,23 @@ export default function Page() {
                           >
                             <span
                               className={cn(
-                                "text-[28px] font-light tabular-nums",
+                                "font-light tabular-nums",
+                                phone ? "text-xl" : "text-[28px]",
                                 on ? "text-background" : "text-foreground"
                               )}
                             >
                               {counts[name]}
                             </span>
                           </div>
-                          <span className="flex items-center gap-1.5 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap">
+                          {/* Phones: the dot alone (the Filter card names them). */}
+                          <span
+                            className={cn(
+                              "flex items-center gap-1.5 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap",
+                              phone && "justify-center"
+                            )}
+                          >
                             <Dot color={dot} />
-                            {name}
+                            {!phone && name}
                           </span>
                         </button>
                       )
@@ -1622,8 +1756,9 @@ export default function Page() {
                 {railNotch("LeadFlow", todayShort)}
 
                 <Notch corner="tr" className="flex items-center gap-2">
-                  {!narrow && (
+                  {(!narrow || phone) && (
                     <RoundButton
+                      className={btnSize}
                       data-flip-id="btn-search"
                       title="Search (⌘K)"
                       onClick={() => setPalette(true)}
@@ -1709,7 +1844,7 @@ export default function Page() {
                 }
               >
                 <section
-                  className="flex min-h-0 flex-[1_1_300px] flex-col gap-[18px] rounded-xl bg-background p-6"
+                  className="flex min-h-0 min-w-0 flex-[1_1_300px] flex-col gap-[18px] rounded-xl bg-background p-6"
                   // Stacked, the list still shows a few follow-ups.
                   style={compact ? { minHeight: 320 } : undefined}
                 >
@@ -1776,7 +1911,7 @@ export default function Page() {
                   </div>
                 </section>
 
-                <section className="flex min-h-0 flex-[1_1_300px] flex-col gap-[18px] overflow-y-auto rounded-xl bg-brand-surface p-6 text-brand-ink">
+                <section className="flex min-h-0 min-w-0 flex-[1_1_300px] flex-col gap-[18px] overflow-y-auto rounded-xl bg-brand-surface p-6 text-brand-ink">
                   <div className="flex items-start justify-between">
                     <Title
                       title="Filter"
@@ -1841,7 +1976,13 @@ export default function Page() {
                 data-flip-id="leads-card"
                 className="relative flex min-h-0 min-w-0 flex-col gap-3.5 rounded-xl bg-background p-6"
               >
-                <div className="flex min-h-[58px] items-start justify-between pr-[200px]">
+                {/* Phones: below the notch rather than beside it. */}
+                <div
+                  className={cn(
+                    "flex min-h-[58px] items-start justify-between",
+                    phone ? "pt-12" : "pr-[200px]"
+                  )}
+                >
                   <Title title="Leads" sub={filterLabel} subRoll="list-sub" />
                 </div>
                 <Notch corner="tr" data-swap>
@@ -1852,7 +1993,11 @@ export default function Page() {
                     View all leads <ArrowRight {...sm} />
                   </button>
                 </Notch>
-                <LeadTable rows={list.results} onOpen={openLead} />
+                <LeadTable
+                  rows={list.results}
+                  onOpen={openLead}
+                  stacked={phone}
+                />
               </section>
             </>
           )}
@@ -1866,7 +2011,7 @@ export default function Page() {
                 className="relative min-w-0"
                 style={{ minHeight: cw < 1114 ? 500 : 380 }}
               >
-                <Hero padding="104px 36px 30px">
+                <Hero padding={heroPad}>
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[13px] font-medium text-muted-foreground">
@@ -1921,7 +2066,7 @@ export default function Page() {
                           </span>
                           <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap">
                             {dot && <Dot color={dot} />}
-                            {name}
+                            <span className="truncate">{name}</span>
                           </span>
                         </button>
                       )
@@ -1941,79 +2086,33 @@ export default function Page() {
                 data-flip-id="leads-card"
                 className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 rounded-xl bg-background p-6"
               >
-                <div className="flex min-h-[58px] items-start justify-between pr-[720px]">
+                <div
+                  className={cn(
+                    "flex min-h-[58px] items-start justify-between",
+                    !narrow && "pr-[720px]"
+                  )}
+                >
                   <Title title="Leads" sub={filterLabel} subRoll="list-sub" />
                 </div>
-                <Notch
-                  corner="tr"
-                  data-swap
-                  className="flex items-center gap-2"
-                >
-                  <Segmented
-                    aria-label="Sort leads"
-                    className="h-13 p-[5px]"
-                    itemClass="h-[42px] px-[18px]"
-                    options={["Recent", "Value", "Name"] as const}
-                    value={sort}
-                    onChange={(v) => {
-                      captureRows()
-                      setSort(v)
-                      setPage(0)
-                    }}
-                  />
-                  <div className="box-border flex h-13 w-[240px] items-center gap-2.5 rounded-full bg-background px-[18px]">
-                    <span className="flex text-muted-foreground">
-                      <Search {...ic} />
-                    </span>
-                    <input
-                      value={q}
-                      onChange={(e) => {
-                        captureRows()
-                        setQ(e.target.value)
-                        setPage(0)
-                      }}
-                      placeholder="Search leads"
-                      aria-label="Search leads"
-                      className="min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-0"
-                    />
+                {narrow ? (
+                  // Too tight beside the title: its own row in the card.
+                  <div className="flex flex-wrap items-center gap-2 rounded-[28px] bg-card p-2">
+                    {leadControls}
                   </div>
-                  <div className="box-border flex h-13 items-center rounded-full bg-background px-1">
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="icon-lg"
-                        className="size-11 min-w-11 rounded-full p-0"
-                        aria-label="Previous page"
-                        title="Previous page"
-                        disabled={page === 0}
-                        onClick={() => setPage(Math.max(0, page - 1))}
-                      >
-                        <ArrowLeft {...sm} />
-                      </Button>
-                      <span className="min-w-14 text-center text-[13px] font-medium whitespace-nowrap tabular-nums">
-                        {page + 1}{" "}
-                        <span className="text-muted-foreground">
-                          of {pageCount}
-                        </span>
-                      </span>
-                      <Button
-                        size="icon-lg"
-                        className="size-11 min-w-11 rounded-full p-0"
-                        aria-label="Next page"
-                        title="Next page"
-                        disabled={page >= pageCount - 1}
-                        onClick={() =>
-                          setPage(Math.min(pageCount - 1, page + 1))
-                        }
-                      >
-                        <ArrowRight {...sm} />
-                      </Button>
-                    </div>
-                  </div>
-                </Notch>
+                ) : (
+                  <Notch
+                    corner="tr"
+                    data-swap
+                    className="flex items-center gap-2"
+                  >
+                    {leadControls}
+                  </Notch>
+                )}
                 <LeadTable
                   rows={list.results}
                   onOpen={openLead}
                   onEdit={openEdit}
+                  stacked={phone}
                 />
               </section>
             </div>
@@ -2025,7 +2124,7 @@ export default function Page() {
               style={{ ...pageStyle, minHeight: 480 + 230 }}
             >
               <div className="relative min-w-0" style={{ minHeight: 480 }}>
-                <Hero padding="104px 36px 118px">
+                <Hero padding={phone ? "80px 20px 106px" : "104px 36px 118px"}>
                   <h1
                     data-roll="h1"
                     className="m-0 text-[30px] leading-[1.15] font-light"
@@ -2100,8 +2199,9 @@ export default function Page() {
                   </div>
                 </Hero>
                 {railNotch("Follow-ups", `${fuLeft} left today`)}
-                {stripArrow(-1)}
-                {stripArrow(1)}
+                {/* Phones swipe the strip instead. */}
+                {!phone && stripArrow(-1)}
+                {!phone && stripArrow(1)}
                 <Notch corner="b">
                   <div className="box-border flex w-[280px] items-center justify-between gap-3 rounded-[28px] bg-attention px-[22px] py-4 text-attention-foreground">
                     <span className="flex flex-col gap-0.5">
@@ -2130,8 +2230,11 @@ export default function Page() {
                     cw < 1014
                       ? "minmax(0,1fr)"
                       : "minmax(0,1.4fr) minmax(0,1fr)",
-                  gridTemplateRows:
-                    cw < 1014 ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)",
+                  gridTemplateRows: phone
+                    ? stackedRows(2)
+                    : cw < 1014
+                      ? "minmax(0,1fr) minmax(0,1fr)"
+                      : "minmax(0,1fr)",
                 }}
               >
                 <section className="flex min-h-0 min-w-0 flex-col gap-[18px] overflow-y-auto rounded-xl bg-background p-6">
@@ -2219,7 +2322,7 @@ export default function Page() {
                 // Room for two rows of figures above the win-rate notch.
                 style={{ minHeight: heroH + 40 }}
               >
-                <Hero padding="104px 36px 30px">
+                <Hero padding={heroPad}>
                   {/* Figures on the left; the chart takes the rest of the
                       panel, full height (stacked below on smaller screens). */}
                   <div
@@ -2264,9 +2367,10 @@ export default function Page() {
                           },
                         ],
                         true,
-                        2
+                        phone ? undefined : 2
                       )}
                     </div>
+                    {phone && periodToggle}
                     <div
                       className="box-content flex min-h-[200px] min-w-0 flex-1 items-end gap-2"
                       style={{
@@ -2285,7 +2389,8 @@ export default function Page() {
                             <div
                               data-bar
                               className={cn(
-                                "box-border flex min-h-11 items-start overflow-hidden rounded-[18px] px-2.5 py-3 transition-[height] duration-300",
+                                "box-border flex min-h-11 items-start overflow-hidden rounded-[18px] py-3 transition-[height] duration-300",
+                                phone ? "px-1.5" : "px-2.5",
                                 last ? "bg-foreground" : "bg-card",
                                 v === 0 && "opacity-45"
                               )}
@@ -2293,7 +2398,8 @@ export default function Page() {
                             >
                               <span
                                 className={cn(
-                                  "text-sm font-normal whitespace-nowrap tabular-nums",
+                                  "font-normal whitespace-nowrap tabular-nums",
+                                  phone ? "text-[11px]" : "text-sm",
                                   last ? "text-background" : "text-foreground"
                                 )}
                               >
@@ -2311,18 +2417,11 @@ export default function Page() {
                 </Hero>
                 {railNotch("Reports", "Updated " + todayShort.split(", ")[1])}
                 <Notch corner="tr" className="flex items-center gap-2">
-                  <Segmented
-                    data-flip-id="periods"
-                    className="h-16 p-1.5"
-                    itemClass={cn("h-13", cw < 1014 ? "px-3" : "px-[18px]")}
-                    options={PERIODS}
-                    value={period}
-                    onChange={pickPeriod}
-                  />
+                  {!phone && periodToggle}
                   {actions(
                     <Button
                       size="icon-lg"
-                      className="size-16 min-w-16 rounded-full p-0"
+                      className={cn(btnSize, "rounded-full p-0")}
                       aria-label="Export report as CSV"
                       title="Export report as CSV"
                       onClick={exportReport}
@@ -2369,7 +2468,10 @@ export default function Page() {
               </div>
 
               <section className="relative flex min-h-0 min-w-0 flex-col gap-[18px] rounded-xl bg-background p-6">
-                <div className="min-h-[58px] pr-[200px]">
+                {/* Phones: below the notch rather than beside it. */}
+                <div
+                  className={cn("min-h-[58px]", phone ? "pt-12" : "pr-[200px]")}
+                >
                   <Title title="Conversion" sub="By stage" />
                 </div>
                 <Notch corner="tr">
@@ -2387,7 +2489,12 @@ export default function Page() {
                   {STAGES.map(([name, dot]) => (
                     <div
                       key={name}
-                      className="grid grid-cols-[130px_minmax(0,1fr)_84px] items-center gap-3.5 px-1"
+                      className={cn(
+                        "grid items-center px-1",
+                        phone
+                          ? "grid-cols-[104px_minmax(0,1fr)_72px] gap-2.5"
+                          : "grid-cols-[130px_minmax(0,1fr)_84px] gap-3.5"
+                      )}
                     >
                       <span className="flex items-center gap-2 text-[13px] font-medium whitespace-nowrap">
                         <Dot color={dot} />
@@ -2470,7 +2577,14 @@ export default function Page() {
 
       {/* Lead timeline */}
       <Sheet open={sheet} onOpenChange={setSheet}>
-        <SheetContent side="right" showCloseButton={false} style={SHEET_STYLE}>
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          // Phones: the full width, with the same 6px inset all round.
+          style={
+            phone ? { ...SHEET_STYLE, left: 6, width: "auto" } : SHEET_STYLE
+          }
+        >
           <NotchedSurface />
           <CloseButton onClick={() => setSheet(false)} />
           <SheetHeader>
@@ -2876,17 +2990,23 @@ function LeadTable({
   rows,
   onOpen,
   onEdit,
+  stacked,
 }: {
   rows: Lead[]
   onOpen: (id: number) => void
   /** Leads tab only: adds a pencil to each row. */
   onEdit?: (lead: Lead) => void
+  /** Phones: name, company and status on the left, value on the right; no
+   *  header and no last note. */
+  stacked?: boolean
 }) {
   // The pencil gets its own column only where editing is offered.
-  const cols = onEdit ? LEAD_COLS + " 36px" : LEAD_COLS
+  const base = stacked ? "minmax(0,1fr) auto" : LEAD_COLS
+  const cols = onEdit ? base + " 36px" : base
   return (
     <>
       <div
+        hidden={stacked}
         className="grid gap-3 px-4 text-xs font-medium text-muted-foreground"
         style={{ gridTemplateColumns: cols }}
       >
@@ -2920,27 +3040,19 @@ function LeadTable({
               <span className="text-xs text-muted-foreground">
                 {l.company || "—"}
               </span>
+              {stacked && <span className="mt-1.5">{status(l)}</span>}
             </span>
-            <span className="flex min-w-0 flex-col items-start gap-1">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-[3px] text-xs font-medium">
-                <Dot color={DOT[l.status]} />
-                {l.status}
-              </span>
-              {nextOf(l) && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Calendar size={12} strokeWidth={1.75} />
-                  {nextOf(l)}
+            {!stacked && status(l)}
+            {!stacked && (
+              <span className="flex min-w-0 flex-col gap-px">
+                <span className="truncate text-[13px]">
+                  {l.last_note?.note ?? "No notes yet"}
                 </span>
-              )}
-            </span>
-            <span className="flex min-w-0 flex-col gap-px">
-              <span className="truncate text-[13px]">
-                {l.last_note?.note ?? "No notes yet"}
+                <span className="text-xs text-muted-foreground">
+                  {ago(lastAt(l))}
+                </span>
               </span>
-              <span className="text-xs text-muted-foreground">
-                {ago(lastAt(l))}
-              </span>
-            </span>
+            )}
             <span className="text-right text-[15px] font-light tabular-nums">
               {money(l.value ?? 0)}
             </span>
@@ -2969,6 +3081,22 @@ function LeadTable({
     </>
   )
 }
+
+/** Status chip, with the next follow-up under it when one is open. */
+const status = (l: Lead) => (
+  <span className="flex min-w-0 flex-col items-start gap-1">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-[3px] text-xs font-medium">
+      <Dot color={DOT[l.status]} />
+      {l.status}
+    </span>
+    {nextOf(l) && (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Calendar size={12} strokeWidth={1.75} />
+        {nextOf(l)}
+      </span>
+    )}
+  </span>
+)
 
 /** The lead's next follow-up, if one is open: "Today, 15:15" or a date. */
 const nextOf = (l: Lead) => {
