@@ -28,6 +28,7 @@ import { Flip } from "gsap/Flip"
 import { toast } from "sonner"
 
 import { ApiFailure, refreshCsrf, toastFailure } from "@/lib/api"
+import { CommandPalette } from "@/components/command-palette"
 import { DateTimePicker } from "@/components/date-time-picker"
 import { NOTCH_R, Notch } from "@/components/notch"
 import { useSession } from "@/components/session"
@@ -172,6 +173,8 @@ export default function Page() {
   const [exported, setExported] = React.useState(false)
   const exportTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
   const bellCount = React.useRef<number | null>(null)
+  // Command palette (search button, ⌘K / Ctrl+K).
+  const [palette, setPalette] = React.useState(false)
   // The lead dialog edits this lead; null means it adds a new one.
   const [editLead, setEditLead] = React.useState<Lead | null>(null)
   const [period, setPeriod] = React.useState<Period>("Month")
@@ -785,6 +788,17 @@ export default function Page() {
     { scope: contentRef, dependencies: [pending.length] }
   )
 
+  // ⌘K / Ctrl+K opens the palette from anywhere on the dashboard.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return
+      e.preventDefault()
+      setPalette((o) => !o)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
   // Rail highlight: one pill slides to the active row instead of each row
   // swapping its own background. Placed without motion on first render.
   const pillPlaced = React.useRef(false)
@@ -974,11 +988,15 @@ export default function Page() {
     }
     setAdd(true)
   }
-  const openLead = (id: number) => {
+  // `lead` when the caller already has it (the palette's results may not be
+  // in any list on screen); otherwise it's found in those lists.
+  const openLead = (id: number, lead?: Lead) => {
     setSelLead(
-      [...list.results, ...today, ...overdue, ...upcoming].find(
-        (l) => l.id === id
-      ) ?? null
+      lead ??
+        [...list.results, ...today, ...overdue, ...upcoming].find(
+          (l) => l.id === id
+        ) ??
+        null
     )
     setSheet(true)
     got(getApiLeadsDiscussions({ path: { id } }), (list) =>
@@ -1607,8 +1625,8 @@ export default function Page() {
                   {!narrow && (
                     <RoundButton
                       data-flip-id="btn-search"
-                      title="Search"
-                      onClick={() => go(1)}
+                      title="Search (⌘K)"
+                      onClick={() => setPalette(true)}
                     >
                       <Search {...ic} />
                     </RoundButton>
@@ -2558,6 +2576,18 @@ export default function Page() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <CommandPalette
+        open={palette}
+        onOpenChange={setPalette}
+        view={view}
+        dotOf={(s) => DOT[s]}
+        onOpenLead={(l) => openLead(l.id, l)}
+        onEditLead={openEdit}
+        onNavigate={go}
+        onAddLead={openAdd}
+        onToggleTheme={toggleTheme}
+      />
 
       {/* Add lead */}
       <Dialog open={add} onOpenChange={setAdd}>
