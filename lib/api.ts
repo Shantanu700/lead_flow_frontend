@@ -88,3 +88,14 @@ export function toastFailure(error: unknown, options?: ExternalToast) {
     options
   )
 }
+
+/** Unwrap an SDK result: hand the data to `apply`, or throw the API error. */
+export async function got<T>(
+  call: Promise<{ data?: T; error?: unknown; response?: Response }>,
+  apply: (data: T) => void
+) {
+  const { data, error, response } = await call
+  if (error !== undefined || data === undefined)
+    throw new ApiFailure(error, response?.status)
+  apply(data)
+}

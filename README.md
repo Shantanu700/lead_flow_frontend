@@ -1,305 +1,67 @@
 # LeadFlow
 
-**A lightweight, single-screen CRM for managing leads, recording discussions, and scheduling follow-ups.**
+**A single-screen CRM for sales reps: track leads, log every discussion, and never miss a follow-up.**
 
-LeadFlow helps a sales representative keep lead details, sales status, discussion history, and the next follow-up in one focused workspace. The interface is centered around a lead list, a timeline dialog, and a compact form for creating leads.
+This repository is the **Next.js frontend**. The API lives in **[lead_flow_backend](https://github.com/Shantanu700/lead_flow_backend)** (Django REST Framework, PostgreSQL, Redis). The app needs both; [Getting Started](#getting-started) runs them together. The original product brief and acceptance checklist are in [docs/SPEC.md](docs/SPEC.md).
 
-> **Project scope:** This README defines the product scope represented by the UI mockups. Features described under “Future Enhancements” are optional additions, not requirements for the initial version. Update implementation and setup details to match the actual repository before publishing.
+![Dashboard](docs/screenshots/dashboard.png)
 
-## Table of Contents
+## Screenshots
 
-- [Overview](#overview)
-- [Core Product Requirements](#core-product-requirements)
-  - [Lead List](#1-lead-list)
-  - [Today's Follow-ups](#2-todays-follow-ups)
-  - [Add New Lead](#3-add-new-lead)
-  - [Lead Timeline Dialog](#4-lead-timeline-dialog)
-- [Lead Statuses](#lead-statuses)
-- [Key Business Rules](#key-business-rules)
-- [Suggested Data Model](#suggested-data-model)
-- [Suggested API Contract](#suggested-api-contract)
-- [Suggested Architecture](#suggested-architecture)
-- [Getting Started](#getting-started)
-- [Testing Checklist](#testing-checklist)
-- [Future Enhancements](#future-enhancements)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Overview
-
-Sales representatives need a simple way to remember who they spoke to, what was discussed, and when they should follow up. LeadFlow keeps those tasks together without requiring a separate page for every lead.
-
-The initial product is deliberately focused. It does not require login, dashboards, a Kanban board, AI features, email integration, or team management to satisfy the core scope.
-
-## Core Product Requirements
-
-### 1. Lead List
-
-The main screen displays the lead list and a status filter.
-
-Each lead entry must show:
-
-- **Lead name**
-- **Company**, when provided
-- **Current status badge**
-- **Last discussion note**
-- **Relative time since the last discussion**, such as “2 hours ago” or “1 week ago”
-
-Selecting a lead opens its timeline dialog on the same screen. It must not navigate to a separate lead details page.
-
-#### Status filters
-
-The list provides filters for:
-
-- All
-- New
-- Contacted
-- Qualified
-- Proposal Sent
-- Won
-- Lost
-
-The filter should update the visible leads without losing the selected lead's saved data. The exact layout can adapt to smaller screens, but every status must remain accessible.
-
-### 2. Today's Follow-ups
-
-Leads with a follow-up scheduled for the current day are displayed in a distinct **Today's Follow-ups** section above the regular lead list.
-
-Each follow-up entry should show:
-
-- Lead name and company
-- Current status
-- Last discussion note and time since that discussion
-- Scheduled follow-up time
-
-Today's follow-ups should remain easy to distinguish from the rest of the list. A lead may also appear in the regular list; the pinned section is a priority view, not a separate lead record.
-
-Follow-up classification must use the application's configured timezone. The UI mockup emphasizes today's follow-ups; highlighting overdue follow-ups is a useful compatible extension.
-
-### 3. Add New Lead
-
-The **Add New Lead** button opens a modal dialog on the same screen.
-
-The form contains:
-
-| Field | Requirement | Behavior |
-|---|---|---|
-| Full Name | Required | Reject empty or whitespace-only values |
-| Company | Optional | May be left blank |
-| Phone | Optional | May be left blank |
-| Status | Not shown in the creation form | Defaults to `New` |
-
-On save:
-
-1. Validate the required name.
-2. Create the lead with status `New`.
-3. Close the dialog after a successful save.
-4. Refresh or update the list so the new lead appears immediately.
-5. Show a useful error if saving fails; do not silently discard the form values.
-
-The initial creation form should remain compact. Additional fields may be added later if they do not make the core workflow unnecessarily complicated.
-
-### 4. Lead Timeline Dialog
-
-Clicking any lead opens a dialog containing its details, status control, discussion history, and note form.
-
-#### Lead header
-
-The dialog header displays:
-
-- Lead name
-- Company, when available
-- Phone number, when available
-- A control to update the lead status
-- A control to close the dialog
-
-#### Discussion history
-
-- Display discussion entries in **reverse chronological order**, with the newest first.
-- Show each entry's date and time, relative time where useful, and note text.
-- If a discussion scheduled a follow-up, show the follow-up date and time with that entry.
-- Show a lead-created event when useful, as illustrated in the mockup.
-
-A lead-created event is not a customer discussion. Keep system events distinguishable from user-entered notes.
-
-#### Add a discussion
-
-At the bottom of the dialog, provide:
-
-- A text area for the new discussion note
-- An optional **Set Follow-up** checkbox
-- A date input, enabled when follow-up scheduling is selected
-- A time input, enabled when follow-up scheduling is selected
-- A **Save Note** action
-
-The note is the required content for a discussion submission. If follow-up scheduling is enabled, both date and time must be valid.
-
-#### Save behavior
-
-When a note is saved successfully:
-
-1. Add the discussion to the lead's history.
-2. If a follow-up was supplied, update the lead's next follow-up date and time.
-3. Reflect the new note and follow-up in the open dialog and lead list immediately.
-4. Display the latest note and its relative timestamp in the lead list.
-5. Preserve the previous discussion entries.
-
-If saving fails, show an error and keep the unsaved content available for correction.
-
-#### Status updates
-
-The status selector in the dialog supports all six statuses: `New`, `Contacted`, `Qualified`, `Proposal Sent`, `Won`, and `Lost`.
-
-A successful status change should update the badge in the dialog and the corresponding lead-list entry immediately. Persist the change in the backend if a backend is used.
-
-## Lead Statuses
-
-| Status | Meaning |
+| Lead drawer: timeline, status, new note with follow-up | Add lead |
 |---|---|
-| `New` | The lead has been added but has not yet been contacted. |
-| `Contacted` | Initial outreach or contact has taken place. |
-| `Qualified` | The lead appears to be a relevant sales opportunity. |
-| `Proposal Sent` | A proposal or quotation has been shared. |
-| `Won` | The opportunity has been successfully converted. |
-| `Lost` | The opportunity is no longer active or was not converted. |
+| ![Lead drawer](docs/screenshots/lead-drawer.png) | ![Add lead](docs/screenshots/add-lead.png) |
+| **Leads: status filter, search, sort, paging** | **Follow-ups: today, upcoming, overdue** |
+| ![Leads](docs/screenshots/leads.png) | ![Follow-ups](docs/screenshots/follow-ups.png) |
+| **Reports: revenue, win rate, funnel, sources** | **Search palette (⌘K)** |
+| ![Reports](docs/screenshots/reports.png) | ![Search](docs/screenshots/search.png) |
+| **Dark theme** | **Sign in** |
+| ![Dark theme](docs/screenshots/dashboard-dark.png) | ![Sign in](docs/screenshots/sign-in.png) |
 
-Status colors should be consistent across the list, follow-up section, and timeline dialog. Color must not be the only way a status is communicated; the status text should always be visible.
+On phones the side rail becomes a bottom tab bar and every tab stacks into one scrolling column:
 
-## Key Business Rules
+<p>
+  <img src="docs/screenshots/phone-dashboard.png" alt="Phone: dashboard" width="260">
+  <img src="docs/screenshots/phone-leads.png" alt="Phone: leads" width="260">
+</p>
 
-These rules are important to keeping the list and timeline consistent:
+## Features
 
-1. **One lead, one identity:** A lead has a stable identifier independent of its name or company.
-2. **Name is required:** Trim whitespace and reject an empty name.
-3. **Status defaults to New:** Newly created leads start with `New`.
-4. **Discussion history is append-only by default:** Adding a note must not overwrite earlier notes.
-5. **Latest note is derived from history:** The list's last-note preview should reflect the newest discussion, not a manually maintained unrelated text field.
-6. **Discussion time and follow-up time are different:** The discussion timestamp records when the note was logged; the follow-up timestamp records when the rep intends to contact the lead.
-7. **Follow-up saves update the lead:** Scheduling a follow-up from a discussion updates the lead's next follow-up field.
-8. **Today's follow-ups are date-aware:** Determine “today” in the configured application timezone.
-9. **Won and Lost are valid statuses:** These statuses remain visible and filterable; they are not removed from the lead list.
-10. **UI state follows save results:** Reflect persisted changes after success, and show an error instead of pretending a failed request succeeded.
+**Core flows (from the brief)**
+- **Lead list:** every lead shows its name, company, status badge, latest discussion note and how long ago it was ("2 hours ago").
+- **Status filter:** All, New, Contacted, Qualified, Proposal Sent, Won and Lost. Filtering happens on the server.
+- **Today's follow-ups:** a pinned section with each lead's company, status, last note and follow-up time. Tick a follow-up off when it's done. "Today" uses the app's timezone (Asia/Kolkata).
+- **Lead drawer (on the same screen, never a new page):**
+  - The discussion history, newest first, on a timeline. Each note shows its time and how long ago; a note that scheduled a follow-up shows it in an orange pill.
+  - A note form with an optional follow-up date and time.
+  - Status changes, saved straight to the server.
+  - A saved note or status change shows in the list immediately.
+- **Add lead:** the name is required (spaces alone are rejected); company, phone, estimated value and source are optional. New leads always start as New.
+- **Errors:** saves show only what the server confirmed. A failed save shows a warning or error toast and keeps what you typed.
 
-If the product later supports multiple future follow-ups per lead, introduce a separate follow-up model and define which pending follow-up is displayed as the lead's next follow-up.
+**Beyond the brief**
+- **Search** by name, company, phone or latest note, from the Leads tab or the ⌘K search palette.
+- **Overdue follow-ups** highlighted on the dashboard (a card you can step through) and on the Follow-ups tab.
+- **Sorting and paging:** by recent activity, value or name.
+- **Reports:** revenue won by week, month or quarter, win rate against the previous period, a conversion funnel, lead sources, and CSV export.
+- **Notification bell:** lists the follow-ups that need you.
+- **Edit leads** from the Leads tab.
+- **Light and dark themes** (press `d`), a phone layout, and animated tab switches that respect reduced motion.
+- **Backend:** Docker Compose dev stack and a seed command with realistic sample data and a demo login (see the backend README).
 
-## Suggested Data Model
+## Tech stack
 
-The following is a suggested implementation, not a claim about the current repository's models.
-
-### Lead
-
-| Field | Purpose |
+| Layer | Choice |
 |---|---|
-| `id` | Stable unique identifier |
-| `name` | Required full name |
-| `company` | Optional company name |
-| `phone` | Optional phone number |
-| `status` | One of the six supported statuses; defaults to `New` |
-| `next_follow_up_at` | Optional date and time of the next follow-up |
-| `created_at` | Creation timestamp |
-| `updated_at` | Last modification timestamp |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript |
+| UI | Tailwind CSS v4, shadcn/ui on Base UI, lucide icons, GSAP for animation, Sonner toasts |
+| API client | Generated from the backend's OpenAPI schema with `@hey-api/openapi-ts` (`src/client/`) |
+| Backend | Django 6 + Django REST Framework, PostgreSQL 17, Redis 8, Celery (separate repo) |
+| Auth | Email and password with a Django session cookie; both servers run over HTTPS on localhost |
 
-### Discussion
-
-| Field | Purpose |
-|---|---|
-| `id` | Stable unique identifier |
-| `lead_id` | Lead associated with the discussion |
-| `note` | Required discussion text |
-| `created_at` | When the note was recorded |
-| `follow_up_at` | Optional follow-up scheduled with this note |
-
-A discussion can store the follow-up date selected when that note was created, while `Lead.next_follow_up_at` provides the current next follow-up used by the lead list. Keep the two values synchronized as part of the same successful operation.
-
-For a relational backend, adding a discussion and updating the lead's follow-up should happen in a database transaction so the two records cannot be left inconsistent.
-
-## Suggested API Contract
-
-If LeadFlow uses a REST API, the following endpoints are a useful starting point. Adapt them to the actual implementation.
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/api/leads/` | List leads; optionally filter by status |
-| `POST` | `/api/leads/` | Create a lead |
-| `GET` | `/api/leads/{id}/` | Retrieve lead details |
-| `PATCH` | `/api/leads/{id}/` | Update lead status or editable fields |
-| `GET` | `/api/leads/{id}/discussions/` | Retrieve discussion history |
-| `POST` | `/api/leads/{id}/discussions/` | Add a discussion and optional follow-up |
-| `GET` | `/api/follow-ups/today/` | Retrieve leads with follow-ups scheduled today |
-
-### Example: create a lead
-
-```json
-{
-  "name": "Sarah Connor",
-  "company": "Acme Corp",
-  "phone": "555-0199"
-}
-```
-
-The server should assign the lead a stable ID and default its status to `New`.
-
-### Example: update a lead's status
-
-```json
-{
-  "status": "Proposal Sent"
-}
-```
-
-### Example: add a discussion with a follow-up
-
-```json
-{
-  "note": "Sent pricing tier PDF. The customer will review it with her boss.",
-  "follow_up_at": "2026-10-16T14:00:00+05:30"
-}
-```
-
-The API should validate the timestamp and return the saved discussion and updated lead follow-up information, or provide a clear validation error. The timestamp above is an illustrative example.
-
-## Suggested Architecture
-
-The project can be implemented with a frontend-only store for a prototype or with a persistent backend for a more complete application.
-
-One suitable full-stack option is:
-
-| Layer | Suggested technology | Responsibility |
-|---|---|---|
-| Frontend | React or Next.js with TypeScript | Main list, status filters, dialogs, and UI state |
-| Styling | Tailwind CSS or an existing component library | Layout, badges, forms, and responsive behavior |
-| Backend | Django REST Framework | Validation, lead operations, discussion creation, and status updates |
-| Database | PostgreSQL | Persistent lead and discussion records |
-
-### Request flow
-
-```text
-Lead list / Timeline dialog
-          |
-          v
-     Frontend state
-          |
-          v
-      REST API
-          |
-          v
-  Business validation
-          |
-          v
-      Database
-          |
-          v
- Updated lead + discussion
-          |
-          v
- Refresh list and open dialog
-```
-
-The mockups represent a single-screen user experience. This does not mean the app must have only one backend endpoint or one component; the UI can be divided into reusable components while keeping navigation on the same screen.
+The brief preferred Next.js with a Python backend; Django REST Framework was used for its built-in auth, admin and migrations.
 
 ## Getting Started
-
-LeadFlow has two repositories: this Next.js frontend and the Django REST backend, **[lead_flow_backend](https://github.com/Shantanu700/lead_flow_backend)**. The app needs both. They run over HTTPS on `localhost`, so the browser treats them as the same site and the login session cookie works.
 
 ### Prerequisites
 
@@ -335,12 +97,21 @@ LeadFlow has two repositories: this Next.js frontend and the Django REST backend
 4. **Start the frontend** (in a second terminal, from the `leadflow` folder):
    ```bash
    cd frontend
+   cp .env.example .env.local
    bun install
    mkdir -p certificates
    mkcert -cert-file certificates/localhost.pem -key-file certificates/localhost-key.pem localhost 127.0.0.1 ::1
    bun dev
    ```
 5. **Open https://localhost:3000** and sign in as `demo@example.com` with the password from step 3, or register a new account.
+
+### Environment variables
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `.env.local` (from `.env.example`) | The backend API. Defaults to `https://localhost:8011`. |
+
+The backend's variables are listed in its own `.env.example`.
 
 ### Stopping and resetting
 
@@ -351,118 +122,56 @@ docker compose -f docker/dev/docker-compose.yml down -v   # stop and delete the 
 docker exec leadflow_dev_web python manage.py seed_fixtures --reset   # fresh sample data
 ```
 
-The frontend calls the API at `https://localhost:8011` by default. To use another address, set it in `.env.local` (gitignored):
+### Scripts
 
 ```bash
-NEXT_PUBLIC_API_URL=https://localhost:8011
-```
-
-### After an API change
-
-The typed API client in `src/client/` is generated from the backend's OpenAPI schema. With the backend running, regenerate it (never edit `src/client/` by hand):
-
-```bash
-bun run openapi-ts
-```
-
-### Checks
-
-```bash
+bun dev               # HTTPS dev server on https://localhost:3000
+bun run build         # production build
 bun run typecheck     # TypeScript
 bun run lint          # ESLint
 bun run format        # Prettier
+bun run openapi-ts    # regenerate src/client/ from the running backend's schema (never edit it by hand)
 ```
 
-Backend tests run inside the `leadflow_dev_web` container with `python -m pytest`.
+## Project structure
 
-### How this build differs from the suggested contract
+```text
+app/
+  auth/                 sign-in / register page
+  dashboard/
+    page.tsx            the frame: rail, content area, drawer, dialog, palette
+    use-dashboard.ts    state, data loading and save handlers (shared via context)
+components/
+  dashboard/
+    views/              one file per tab: overview, leads, follow-ups, reports
+    lead-sheet.tsx      lead drawer: timeline, status, note form
+    lead-dialog.tsx     add / edit lead
+    lead-table.tsx      the lead rows
+    rail.tsx            side rail (bottom tab bar on phones)
+    chrome.tsx          buttons and figures shared by the tabs
+  command-palette.tsx   ⌘K search
+  date-time-picker.tsx  follow-up date and time
+  notch.tsx             the corner cut-outs that hold controls
+  ui/                   shadcn/ui components
+hooks/                  tab-switch and in-place animations (GSAP)
+lib/                    API setup and errors, formatting (₹, dates), constants, layout
+src/client/             generated API client
+docs/                   SPEC.md (the brief) and screenshots
+```
+
+## How this differs from the suggested API contract
 
 - Updates use `PUT /api/leads/{id}/` (not `PATCH`).
 - `GET /api/leads/` is paginated (`page`, `page_size` up to 50) and also takes `status`, `q` (searches name, company, phone and the latest note) and `ordering=recent|value|name`.
 - Leads also carry an estimated `value` (₹) and a `source`.
 - Extra endpoints: `/api/follow-ups/overdue/`, `/api/follow-ups/upcoming/`, and per-tab figures at `/api/stats/dashboard|leads|reports/`.
-- Sign-in is required (email and password, Django session).
+- Sign-in is required (the brief made it optional); a demo account is seeded.
 
-## Testing Checklist
+## Testing
 
-Use the following acceptance checklist to validate that the implementation matches the mockups and requirements.
+- **Backend:** a pytest suite covers auth, leads, discussions, follow-ups, stats and the seed data. Run it with `docker exec leadflow_dev_web python -m pytest`.
+- **Frontend:** every change was checked with `typecheck`, `lint` and `build`, then in a real browser at desktop and phone widths with Playwright scripts. Those scripts exercised the checklist in [docs/SPEC.md](docs/SPEC.md), the save and error paths, and the animations. They were run locally and are not part of this repo.
 
-### Lead list
+## Use of AI
 
-- [ ] All six status filters are available, including `Won` and `Lost`.
-- [ ] Every lead shows its name, status, latest note preview, and time since discussion.
-- [ ] Company is displayed when present and omitted gracefully when absent.
-- [ ] Clicking a lead opens the timeline dialog without navigating away.
-- [ ] A new note or status change appears in the list after saving.
-
-### Today's follow-ups
-
-- [ ] Leads scheduled for today appear in a separate section above all leads.
-- [ ] Each entry displays the scheduled follow-up time.
-- [ ] The section uses the configured timezone to determine today's date.
-- [ ] A lead without a follow-up is not shown in this section.
-
-### Add New Lead
-
-- [ ] The Add New Lead button opens a modal.
-- [ ] Name is required; company and phone are optional.
-- [ ] A new lead defaults to `New`.
-- [ ] Successful saving adds the lead to the list and closes the modal.
-- [ ] Validation and server errors are clearly communicated.
-
-### Timeline dialog
-
-- [ ] The newest discussion appears first.
-- [ ] Each discussion displays its timestamp and note.
-- [ ] The status can be changed using the dialog's status selector.
-- [ ] Follow-up date and time controls are optional.
-- [ ] When follow-up scheduling is enabled, date and time are both validated.
-- [ ] Saving a note with a follow-up updates the lead's next follow-up field.
-- [ ] Earlier discussions remain visible after a new note is saved.
-- [ ] Failed saves do not discard the user's note without warning.
-
-### General quality
-
-- [ ] Dialogs can be closed using their close control and, where supported, Escape.
-- [ ] Forms have accessible labels and visible validation messages.
-- [ ] The layout remains usable on smaller screens.
-- [ ] API validation and persistence rules are tested if a backend is used.
-
-## Future Enhancements
-
-The following are optional extensions. They are not required to match the supplied UI mockups.
-
-### Useful next steps
-
-- Search by lead name, company, or phone
-- Sort leads by recent discussion or follow-up time
-- Highlight overdue follow-ups
-- Record status-change events in the timeline
-- Add email addresses, lead source, tags, and next-action text
-- Add CSV import/export and duplicate detection
-- Add a Kanban pipeline and basic sales analytics
-- Send optional in-app or email reminders
-
-### Advanced possibilities
-
-- Explainable lead scoring
-- AI-generated discussion summaries and suggested next actions
-- Email templates and provider integration
-- Team assignments and role-based permissions
-- Conversion analysis and sales forecasting
-
-Build these only after the core list, timeline, status update, and follow-up workflows are reliable.
-
-## Contributing
-
-1. Create an issue describing the proposed change.
-2. Make a focused branch.
-3. Keep changes aligned with the product scope and include tests for business rules.
-4. Run the relevant linting, type checks, and test suite.
-5. Open a pull request describing the change and any configuration or migration impact.
-
-Update this README when the required behavior or setup instructions change.
-
-## License
-
-No license is specified in this document. Add a `LICENSE` file before distributing the project under an open-source license.
+I built LeadFlow with the help of **[Claude Code](https://claude.com/claude-code)** (Anthropic), as the brief recommends. I designed the product and its interface, chose the stack and the API design, and directed the work feature by feature. Claude Code assisted with writing and refining the code, tests and docs. I reviewed and approved every change before it was committed. Commits it helped with carry a `Co-Authored-By: Claude` trailer.
