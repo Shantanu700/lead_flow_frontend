@@ -11,7 +11,6 @@ import {
   Check,
   Download,
   House,
-  Inbox,
   LogOut,
   Moon,
   PanelLeftClose,
@@ -115,6 +114,9 @@ export default function Page() {
   const [q, setQ] = React.useState("")
   const [pageIdx, setPage] = React.useState(0)
   const [fu, setFu] = React.useState(FU.map((f) => f.done))
+  // Today's follow-up strip: which ends it can still scroll towards.
+  const stripRef = React.useRef<HTMLDivElement>(null)
+  const [stripEdge, setStripEdge] = React.useState({ start: true, end: true })
   const [od, setOd] = React.useState(0)
   const [sheet, setSheet] = React.useState(false)
   const [sel, setSel] = React.useState(1)
@@ -153,8 +155,6 @@ export default function Page() {
   // Lead rows before a list change (see captureRows).
   const rowsState = React.useRef<Flip.FlipState | null>(null)
   const prevIds = React.useRef<Set<string>>(new Set())
-  // View the entrance effect last ran for.
-  const shownView = React.useRef(view)
   // Corner the bottom notch sat in before the switch.
   const attFrom = React.useRef<string | undefined>(undefined)
   const ghosts = React.useRef<Map<string, { node: HTMLElement; text: string }>>(
@@ -178,8 +178,9 @@ export default function Page() {
   const shape = () => {
     const hero = contentRef.current?.querySelector<HTMLElement>("[data-hero]")
     if (!hero) return []
-    const notches = [...(hero.parentElement?.children ?? [])].filter((c) =>
-      c.hasAttribute("data-notch")
+    // data-swap notches belong to one view: they fade, they don't morph.
+    const notches = [...(hero.parentElement?.children ?? [])].filter(
+      (c) => c.hasAttribute("data-notch") && !c.hasAttribute("data-swap")
     ) as HTMLElement[]
     notches.forEach((n) => {
       const c = n.dataset.notch
@@ -328,7 +329,7 @@ export default function Page() {
   // Ids each view renders, so the exit knows what will survive the swap.
   // Lead rows are added from the data (see rowIds).
   const rowIds = (v: number) =>
-    (v === 0 || v === 4
+    (v === 0
       ? shown.slice(0, 5)
       : v === 1
         ? shown.slice(page * 10, page * 10 + 10)
@@ -339,12 +340,6 @@ export default function Page() {
     () => {
       const grid = contentRef.current
       if (!grid) return
-      // Dashboard <-> Inbox share a layout: nothing enters, nothing to play.
-      const layout = (v: number) => (v === 4 ? 0 : v)
-      const swapOnly =
-        shownView.current !== view && layout(shownView.current) === layout(view)
-      shownView.current = view
-      if (swapOnly) return
       const shapeEls = shape()
       const bars = grid.querySelectorAll("[data-bar]")
       const from = flipState.current
@@ -408,9 +403,17 @@ export default function Page() {
         const flips = flipEls()
         const kept = flips.filter((el) => prevIds.current.has(idOf(el)))
         const keptSet = new Set(kept)
+        // While the hero is out of the flow, hold its slot at the new
+        // hero's real height; otherwise the slot falls back to its min-height
+        // and the panels below jump up under the hero, then drop back.
+        const slot = shapeEls[0]?.parentElement
+        if (slot) gsap.set(slot, { height: shapeEls[0].offsetHeight })
         Flip.from(from, {
           targets: kept,
           nested: true,
+          onComplete: () => {
+            if (slot) gsap.set(slot, { clearProps: "height" })
+          },
           // The hero (and blocks inside it) leave the flow while morphing, so
           // their in-between size doesn't push the panels below. Rows and the
           // leads card stay in flow: new rows must keep their slots.
@@ -493,18 +496,16 @@ export default function Page() {
   // contextSafe at click time, so the exit tweens join the GSAP context.
   const go = (next: number) =>
     contextSafe(() => {
-      // Inbox shows the Dashboard layout: nothing to morph between them.
-      const same = (v: number) => (v === 4 ? 0 : v)
       if (next === view || switching.current) return
       setNav(next)
-      if (same(next) === same(view) || reduceMotion()) return setView(next)
+      if (reduceMotion()) return setView(next)
       const grid = contentRef.current
       if (!grid) return setView(next)
       switching.current = true
       gsap.set(grid, { overflow: "hidden" })
 
       const shapeEls = shape()
-      const nextIds = new Set([...VIEW_FLIP[same(next)], ...rowIds(next)])
+      const nextIds = new Set([...VIEW_FLIP[next], ...rowIds(next)])
       const flips = flipEls()
       const kept = flips.filter((el) => nextIds.has(idOf(el)))
       const leavingPanels = panels().filter(
@@ -778,6 +779,53 @@ export default function Page() {
     toast.success(`Moved to ${status}.`)
   }
 
+  const readStrip = () => {
+    const el = stripRef.current
+    if (!el) return
+    setStripEdge({
+      start: el.scrollLeft <= 1,
+      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 1,
+    })
+  }
+  // One page of tiles per press; snapping lines the result up on a tile.
+  const scrollStrip = (dir: 1 | -1) => {
+    const el = stripRef.current
+    if (!el) return
+    el.scrollBy({
+      left: dir * (el.clientWidth + 8),
+      behavior: reduceMotion() ? "auto" : "smooth",
+    })
+  }
+  const stripArrow = (dir: 1 | -1) => (
+    <Notch corner={dir < 0 ? "bl" : "br"} data-swap>
+      <Button
+        size="icon-lg"
+        className="size-16 min-w-16 rounded-full p-0"
+        aria-label={dir < 0 ? "Earlier follow-ups" : "Later follow-ups"}
+        title={dir < 0 ? "Earlier follow-ups" : "Later follow-ups"}
+        disabled={dir < 0 ? stripEdge.start : stripEdge.end}
+        onClick={() => scrollStrip(dir)}
+      >
+        {dir < 0 ? (
+          <ArrowLeft {...ic} className="size-5" />
+        ) : (
+          <ArrowRight {...ic} className="size-5" />
+        )}
+      </Button>
+    </Notch>
+  )
+
+  // Opening Follow-ups: start the strip at the first tile still to do.
+  React.useEffect(() => {
+    const el = stripRef.current
+    if (view !== 2 || !el) return
+    const next = [...el.children].find(
+      (c) => c instanceof HTMLElement && !c.dataset.fuDone
+    ) as HTMLElement | undefined
+    el.scrollLeft = next ? next.offsetLeft - el.offsetLeft : 0
+    readStrip()
+  }, [view])
+
   const railNotch = (title: string, sub?: string) => (
     <Notch corner="tl" className="flex items-center gap-2">
       <RoundButton
@@ -850,39 +898,43 @@ export default function Page() {
     </div>
   )
   /** Figures with a leader line. `row` lays them out side by side
-   *  (left-aligned) instead of stacked on the hero's right. */
+   *  (left-aligned) instead of stacked on the hero's right; `cols` puts
+   *  them in that many columns, wrapping onto further rows. */
   const callouts = (
     items: { value: string; label: string }[],
-    row = compact
+    row = compact,
+    cols?: number
   ) => (
     <div
       data-flip-id="callouts"
-      className="flex flex-wrap gap-x-7 gap-y-[18px] pt-1.5 pr-2"
-      style={{ flexDirection: row ? "row" : "column" }}
+      className={cn(
+        "gap-x-4 gap-y-5 pt-1.5",
+        cols ? "grid w-fit" : "flex flex-wrap"
+      )}
+      style={
+        cols
+          ? { gridTemplateColumns: `repeat(${cols}, auto)` }
+          : { flexDirection: row ? "row" : "column" }
+      }
     >
       {items.map((c, i) => (
-        <div key={c.label} className="flex items-center gap-3">
-          <div
-            className={cn(
-              "flex flex-col gap-0.5",
-              row && !compact ? "items-start" : "items-end"
-            )}
+        // Label over value, set off by a thin rule on the left.
+        <div
+          key={c.label}
+          className="flex min-w-[140px] flex-col gap-1.5 border-l border-muted-foreground/40 pr-6 pl-4"
+        >
+          <span
+            data-roll={"co-l" + i}
+            className="text-[13px] text-muted-foreground"
           >
-            <span
-              data-roll={"co-v" + i}
-              className="text-2xl font-light tabular-nums"
-            >
-              {c.value}
-            </span>
-            <span
-              data-roll={"co-l" + i}
-              className="text-[13px] text-muted-foreground"
-            >
-              {c.label}
-            </span>
-          </div>
-          <span className="h-px w-14 bg-muted-foreground" />
-          <span className="size-2 rounded-full bg-foreground" />
+            {c.label}
+          </span>
+          <span
+            data-roll={"co-v" + i}
+            className="text-[28px] leading-none font-light tabular-nums"
+          >
+            {c.value}
+          </span>
         </div>
       ))}
     </div>
@@ -980,7 +1032,7 @@ export default function Page() {
               ? "minmax(0,1fr)"
               : "minmax(0,1fr) minmax(320px,380px)",
             gridTemplateRows:
-              view === 0 || view === 4
+              view === 0
                 ? compact
                   ? "auto auto auto"
                   : "auto minmax(220px,1fr)"
@@ -989,7 +1041,7 @@ export default function Page() {
                   : "1fr",
           }}
         >
-          {(view === 0 || view === 4) && (
+          {view === 0 && (
             <>
               {/* Hero */}
               <div className="relative min-w-0" style={{ minHeight: heroH }}>
@@ -1420,12 +1472,9 @@ export default function Page() {
           {view === 2 && (
             <div
               className="flex min-h-0 min-w-0 flex-col gap-2.5"
-              style={{ ...pageStyle, minHeight: (cw < 1014 ? 640 : 480) + 230 }}
+              style={{ ...pageStyle, minHeight: 480 + 230 }}
             >
-              <div
-                className="relative min-w-0"
-                style={{ minHeight: cw < 1014 ? 640 : 480 }}
-              >
+              <div className="relative min-w-0" style={{ minHeight: 480 }}>
                 <Hero padding="104px 36px 118px">
                   <h1
                     data-roll="h1"
@@ -1437,26 +1486,37 @@ export default function Page() {
                     </span>
                   </h1>
                   <div className="min-h-6 flex-1" />
+                  {/* One row at a fixed height: more follow-ups scroll
+                      sideways (snapping to tiles) instead of growing the
+                      panel. The corner arrows page through it. */}
                   <div
-                    className="grid gap-2"
-                    style={{
-                      gridTemplateColumns:
-                        cw < 1014
-                          ? "repeat(2,minmax(0,1fr))"
-                          : "repeat(4,minmax(0,1fr))",
-                    }}
+                    ref={stripRef}
+                    onScroll={readStrip}
+                    className="flex snap-x snap-mandatory [scrollbar-width:none] gap-2 overflow-x-auto overscroll-x-contain [&::-webkit-scrollbar]:hidden"
                   >
+                    {FU.length === 0 && (
+                      <div className="flex h-[150px] w-full items-center rounded-[20px] bg-card px-5 text-sm text-muted-foreground">
+                        No follow-ups today.
+                      </div>
+                    )}
                     {FU.map((f, i) => (
                       <button
                         key={f.name}
+                        data-fu-done={fu[i] || undefined}
                         onClick={() => toggleFu(i)}
                         title={fu[i] ? "Mark as not done" : "Mark as done"}
                         className={cn(
-                          "box-border flex h-[150px] min-w-0 cursor-pointer flex-col justify-between gap-[22px] rounded-[20px] border-0 p-4 text-left transition-colors duration-200",
+                          "box-border flex h-[150px] min-w-0 flex-none cursor-pointer snap-start flex-col justify-between gap-[22px] rounded-[20px] border-0 p-4 text-left transition-colors duration-200",
                           fu[i]
                             ? "bg-foreground text-background"
                             : "bg-card text-foreground"
                         )}
+                        style={{
+                          width:
+                            cw < 1014
+                              ? "calc((100% - 8px) / 2)"
+                              : "calc((100% - 24px) / 4)",
+                        }}
                       >
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-[28px] leading-none font-light tabular-nums">
@@ -1486,6 +1546,8 @@ export default function Page() {
                   </div>
                 </Hero>
                 {railNotch("Follow-ups", `${fuLeft} left today`)}
+                {stripArrow(-1)}
+                {stripArrow(1)}
                 <Notch corner="b">
                   <div className="box-border flex w-[280px] items-center justify-between gap-3 rounded-[28px] bg-attention px-[22px] py-4 text-attention-foreground">
                     <span className="flex flex-col gap-0.5">
@@ -1590,70 +1652,87 @@ export default function Page() {
             >
               <div
                 className="relative col-span-full min-w-0"
-                style={{ minHeight: heroH }}
+                // Room for two rows of figures above the win-rate notch.
+                style={{ minHeight: heroH + 40 }}
               >
                 <Hero padding="104px 36px 30px">
-                  <div className="flex flex-wrap justify-between gap-6">
-                    <div className="flex flex-col gap-3.5">
-                      <h1
-                        data-roll="h1"
-                        className="m-0 text-[30px] leading-[1.15] font-light"
-                      >
-                        Revenue won
-                        <span className="block text-muted-foreground">
-                          {series.label}
-                        </span>
-                      </h1>
-                      {bigNumber(money(series.total))}
-                    </div>
-                    {callouts([
-                      { value: String(series.deals), label: "Deals won" },
-                      { value: money(series.size), label: "Avg. deal size" },
-                      {
-                        value: series.days + " days",
-                        label: "Avg. time to close",
-                      },
-                    ])}
-                  </div>
-                  <div className="min-h-10 flex-1" />
+                  {/* Figures on the left; the chart takes the rest of the
+                      panel, full height (stacked below on smaller screens). */}
                   <div
-                    className="box-content flex h-[200px] flex-none items-end gap-2"
-                    style={{
-                      paddingLeft: narrow ? 0 : odW + 10,
-                      paddingBottom: narrow ? 150 : 0,
-                    }}
+                    className={cn(
+                      "flex min-h-0 flex-1 gap-10",
+                      compact ? "flex-col" : "flex-row"
+                    )}
                   >
-                    {series.bars.map(([label, v], i) => {
-                      const last = i === series.bars.length - 1
-                      return (
-                        <div
-                          key={label}
-                          className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2.5"
+                    <div className="flex flex-none flex-col gap-6">
+                      <div className="flex flex-col gap-3.5">
+                        <h1
+                          data-roll="h1"
+                          className="m-0 text-[30px] leading-[1.15] font-light"
                         >
+                          Revenue won
+                          <span className="block text-muted-foreground">
+                            {series.label}
+                          </span>
+                        </h1>
+                        {bigNumber(money(series.total))}
+                      </div>
+                      {callouts(
+                        [
+                          { value: String(series.deals), label: "Deals won" },
+                          {
+                            value: money(series.size),
+                            label: "Avg. deal size",
+                          },
+                          {
+                            value: series.days + " days",
+                            label: "Avg. time to close",
+                          },
+                        ],
+                        true,
+                        2
+                      )}
+                    </div>
+                    <div
+                      className="box-content flex min-h-[200px] min-w-0 flex-1 items-end gap-2"
+                      style={{
+                        // Stacked, the chart clears the bottom-left win-rate notch.
+                        paddingLeft: compact && !narrow ? odW + 10 : 0,
+                        paddingBottom: narrow ? 150 : 0,
+                      }}
+                    >
+                      {series.bars.map(([label, v], i) => {
+                        const last = i === series.bars.length - 1
+                        return (
                           <div
-                            data-bar
-                            className={cn(
-                              "box-border flex min-h-11 items-start overflow-hidden rounded-[18px] px-2.5 py-3 transition-[height] duration-300",
-                              last ? "bg-foreground" : "bg-card",
-                              v === 0 && "opacity-45"
-                            )}
-                            style={{ height: (v / bmax) * 100 + "%" }}
+                            key={label}
+                            className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2.5"
                           >
-                            <span
+                            <div
+                              data-bar
                               className={cn(
-                                "text-sm font-normal whitespace-nowrap tabular-nums",
-                                last ? "text-background" : "text-foreground"
+                                "box-border flex min-h-11 items-start overflow-hidden rounded-[18px] px-2.5 py-3 transition-[height] duration-300",
+                                last ? "bg-foreground" : "bg-card",
+                                v === 0 && "opacity-45"
                               )}
+                              style={{ height: (v / bmax) * 100 + "%" }}
                             >
-                              {kfmt(v)}
+                              <span
+                                className={cn(
+                                  "text-sm font-normal whitespace-nowrap tabular-nums",
+                                  last ? "text-background" : "text-foreground"
+                                )}
+                              >
+                                {kfmt(v)}
+                              </span>
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {label}
                             </span>
                           </div>
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {label}
-                          </span>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
                 </Hero>
                 {railNotch("Reports", "Updated " + todayShort.split(", ")[1])}
@@ -1763,7 +1842,7 @@ export default function Page() {
                 </div>
                 {/* Part-to-whole: one bar split by share, largest first, in
                     steps of the ink (2px surface gaps between segments). */}
-                <div className="flex h-14 gap-0.5 overflow-hidden rounded-[18px]">
+                <div className="flex h-14 flex-none gap-0.5 overflow-hidden rounded-[18px]">
                   {SOURCES.map(([name, p], i) => (
                     <span
                       key={name}
@@ -2384,7 +2463,6 @@ const NAV = [
   ["Leads", Users],
   ["Follow-ups", Calendar],
   ["Reports", ChartColumn],
-  ["Inbox", Inbox],
 ] as const
 
 const PIPELINE = 184200
@@ -2461,6 +2539,7 @@ const FU = [
     task: "Send revised quote",
     done: true,
   },
+  { name: "Hana Kim", time: "12:15", task: "Confirm budget", done: false },
   { name: "Elena Ruiz", time: "13:00", task: "Intro call", done: false },
   {
     name: "Daniel Okafor",
@@ -2468,7 +2547,14 @@ const FU = [
     task: "Share case study",
     done: false,
   },
+  {
+    name: "Ethan Brooks",
+    time: "16:00",
+    task: "Review contract terms",
+    done: false,
+  },
   { name: "Kabir Khan", time: "17:00", task: "Book a demo", done: false },
+  { name: "Grace Lee", time: "18:00", task: "Check in on trial", done: false },
 ]
 const OVERDUE = [
   {
