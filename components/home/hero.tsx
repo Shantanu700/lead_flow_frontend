@@ -64,6 +64,8 @@ export function Hero({
       const q = gsap.utils.selector(root)
       const stage = q("[data-stage]")[0] as HTMLElement
       const half = () => stage.clientWidth / 2 + 5
+      // The leads and filter panels' row under the finished hero, plus the gap.
+      const rowH = () => (q("[data-row]")[0] as HTMLElement).offsetHeight + 10
       const mm = gsap.matchMedia()
       mm.add(
         {
@@ -132,21 +134,51 @@ export function Hero({
             { x: -56, autoAlpha: 0, duration: 0.3, ease: "power1.in" },
             0
           )
+          // The panel's clip: its left edge opens to the rail, then its bottom
+          // rises to make room for the dashboard's lower row of panels.
+          const [panel] = q("[data-panel]")
+          const clip = { l: 0, b: 0 }
+          const setClip = () =>
+            gsap.set(panel, {
+              clipPath: `inset(0px 0px ${clip.b}px ${clip.l}px round 32px)`,
+            })
+          const lift = { duration: 0.3, ease: "power2.inOut" }
+          tl.fromTo(
+            clip,
+            { l: () => half() },
+            { l: 86, duration: 0.45, ease: "power2.inOut", onUpdate: setClip },
+            0.05
+          )
             .fromTo(
-              q("[data-panel]"),
-              { clipPath: () => `inset(0px 0px 0px ${half()}px round 32px)` },
-              {
-                clipPath: "inset(0px 0px 0px 86px round 32px)",
-                duration: 0.45,
-                ease: "power2.inOut",
-              },
-              0.05
+              clip,
+              { b: 0 },
+              { b: () => rowH(), ...lift, onUpdate: setClip },
+              0.42
             )
             .fromTo(
               q("[data-bl]"),
               { x: 0 },
               { x: () => 86 - half(), duration: 0.45, ease: "power2.inOut" },
               0.05
+            )
+            // The follow-ups notch rides up with the hero's bottom edge.
+            .fromTo(
+              q("[data-bl]"),
+              { y: 0 },
+              { y: () => -rowH(), ...lift },
+              0.42
+            )
+            .fromTo(
+              q("[data-row] > *"),
+              { y: 60, autoAlpha: 0 },
+              {
+                y: 0,
+                autoAlpha: 1,
+                stagger: 0.06,
+                duration: 0.3,
+                ease: "power3.out",
+              },
+              0.56
             )
             .fromTo(
               q("[data-rail]"),
@@ -180,7 +212,7 @@ export function Hero({
     >
       <div
         data-stage
-        className="relative flex h-full flex-col gap-2.5 lg:block lg:overflow-hidden"
+        className="relative flex h-full flex-col gap-2.5 [--row:clamp(230px,36%,330px)] lg:block lg:overflow-hidden"
       >
         <Copy signedIn={signedIn} />
         <Rail />
@@ -189,6 +221,7 @@ export function Hero({
           className="pointer-events-none relative min-h-[600px] animate-in delay-150 duration-700 ease-out fade-in-0 fill-mode-both motion-reduce:animate-none lg:absolute lg:inset-0 lg:min-h-0"
         >
           <Panel />
+          <LowerRow />
           {/* Top right: the theme and Log in buttons sit here until the
               header takes them. */}
           {/* Its outer corner follows the card's (44px less the 10px
@@ -328,6 +361,84 @@ export function ArrowLink({
   )
 }
 
+const ROWS = LIVE.map((l, i) => ({
+  name: l.name,
+  company: l.company,
+  value: l.value,
+  status: (["Proposal Sent", "Qualified", "New", "Contacted"] as const)[i],
+}))
+const TOTAL = STAGE_COUNTS.reduce((a, [, n]) => a + n, 0)
+
+/** Wide screens: the dashboard's lower row (the leads card and the orange
+ *  filter card), rising in under the finished hero. Example data. */
+function LowerRow() {
+  return (
+    <div
+      data-row
+      aria-hidden
+      className="absolute right-0 bottom-0 left-[86px] hidden h-(--row) gap-2.5 lg:flex"
+    >
+      <div className="invisible flex min-w-0 flex-1 flex-col gap-3.5 overflow-hidden rounded-[32px] bg-background p-6">
+        <h3 className="m-0 text-2xl leading-[1.2] font-light">
+          Leads
+          <span className="block text-muted-foreground">All statuses</span>
+        </h3>
+        <div className="flex min-h-0 flex-col gap-1.5">
+          {ROWS.map((r) => (
+            <div
+              key={r.name}
+              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-[18px] bg-card px-4 py-2.5"
+            >
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">{r.name}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {r.company}
+                </span>
+              </span>
+              <span className="flex items-center gap-1.5 justify-self-start rounded-full bg-secondary px-2.5 py-[3px] text-xs font-medium">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ background: DOT[r.status] }}
+                />
+                {r.status}
+              </span>
+              <span className="text-[15px] font-light tabular-nums">
+                {money(r.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="invisible flex w-[380px] flex-none flex-col gap-4 overflow-hidden rounded-[32px] bg-brand-surface p-6 text-brand-ink">
+        <div className="flex items-start justify-between">
+          <h3 className="m-0 text-2xl leading-[1.2] font-light">
+            Filter
+            <span className="block text-brand-ink/70">By status</span>
+          </h3>
+          <span className="text-sm">{TOTAL} shown</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-brand-ink px-3 py-1.5 text-[13px] font-medium text-white">
+            All {TOTAL}
+          </span>
+          {STAGE_COUNTS.map(([name, n]) => (
+            <span
+              key={name}
+              className="flex items-center gap-1.5 rounded-full border border-brand-ink/25 px-3 py-1.5 text-[13px] font-medium"
+            >
+              <span
+                className="size-2 rounded-full"
+                style={{ background: DOT[name] }}
+              />
+              {name} {n}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** The dark rail that slides in as the hero becomes the dashboard. */
 function Rail() {
   return (
@@ -426,7 +537,7 @@ function Panel() {
 
 function Dashboard() {
   return (
-    <div className="absolute inset-0 flex flex-col px-5 pt-24 pb-6 sm:px-9 lg:pt-[104px] lg:pr-9 lg:pl-[122px]">
+    <div className="absolute inset-0 flex flex-col px-5 pt-24 pb-6 sm:px-9 lg:bottom-[calc(var(--row)+10px)] lg:pt-[104px] lg:pr-9 lg:pl-[122px]">
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="flex flex-col gap-6">
           <h2
@@ -478,7 +589,10 @@ function Dashboard() {
             >
               {n}
             </span>
-            <span className="flex items-center gap-1.5 truncate text-xs font-medium">
+            <span
+              data-dash-text
+              className="flex items-center gap-1.5 truncate text-xs font-medium"
+            >
               <span
                 className="size-2 flex-none rounded-full"
                 style={{ background: DOT[name] }}
