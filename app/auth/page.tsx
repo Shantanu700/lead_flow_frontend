@@ -11,6 +11,7 @@ import { ApiFailure, OFFLINE, refreshCsrf, toastFailure } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Logo } from "@/components/logo"
 import { ModeToggle } from "@/components/mode-toggle"
 import teamPhoto from "@/public/auth/team.jpg"
 import {
@@ -41,23 +42,6 @@ const COPY = {
     switchAction: "Log in",
   },
 } as const
-
-function Logo() {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="grid size-13 flex-none place-items-center rounded-full bg-primary">
-        <span className="flex items-end gap-[3px]">
-          <span className="h-2.5 w-1.5 rounded-[3px] bg-primary-foreground/60" />
-          <span className="h-4 w-1.5 rounded-[3px] bg-primary-foreground/80" />
-          <span className="h-[22px] w-1.5 rounded-[3px] bg-primary-foreground" />
-        </span>
-      </span>
-      <span className="text-[22px] font-medium tracking-[-0.01em]">
-        LeadFlow
-      </span>
-    </div>
-  )
-}
 
 function Field({
   id,
@@ -131,6 +115,7 @@ function PasswordInput({
 }
 
 const MODES = ["login", "register"] as const
+const noSubscribe = () => () => {}
 
 /** Both modes' text share one grid cell, so swapping crossfades in place
  *  without the width jumping. The hidden copy is inert. */
@@ -377,7 +362,15 @@ function EdgeNotch({
 
 export default function AuthPage() {
   const router = useRouter()
-  const [mode, setMode] = React.useState<Mode>("login")
+  // The home page's "Create free account" links here with ?mode=register.
+  // Read after hydration (the server always renders Log in).
+  const linked = React.useSyncExternalStore(
+    noSubscribe,
+    () => new URLSearchParams(location.search).get("mode") === "register",
+    () => false
+  )
+  const [picked, setMode] = React.useState<Mode | null>(null)
+  const mode: Mode = picked ?? (linked ? "register" : "login")
   const [pending, setPending] = React.useState(false)
   const [mismatch, setMismatch] = React.useState(false)
   const confirmRef = React.useRef<HTMLInputElement>(null)

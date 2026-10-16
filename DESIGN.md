@@ -82,6 +82,18 @@ The dashboard follows its claude.ai/design file and is the one place with its ow
 - Controls sit in **notches**: card-coloured cut-outs in a panel's corner with 36px fillets (`components/notch.tsx`). The sheet and dialog cut their top-right corner for a 48px close button.
 - Hero panels and the rail are `.dark` in both themes.
 
+### Landing page (`/`)
+
+- **Sections** are `bg-card` cards (`rounded-[44px] p-2.5 shadow-card`, max 1320px) on the canvas, 10px apart, like the dashboard frame: the hero, Features (the tour and three hover cards), and Get started with the footer.
+- **Notches** hold the controls, as on the dashboard: the hero photo's top-right notch has the theme toggle and Log in, its bottom-left notch today's follow-ups; the tour's preview names the active view in its top-left notch; Get started puts its two links in a bottom-right notch. A notch over a `.dark` panel must sit outside the `.dark` element so it keeps the card colour.
+- **Scroll story** (GSAP ScrollTrigger, wide screens):
+  - The hero is held on screen while it becomes the dashboard (scrubbed): the copy slides away, the panel's clip opens from the right half to the rail, the photo fades to the dark hero, the rail slides in, the figures count up and the tiles grow. The top-right notch stays put.
+  - In the last 300px of that hold the notch's buttons fly into a floating header that grows in around them, and the notch closes behind them. The buttons live in one fixed layer and are placed between the two slots by scroll (`components/home/home.tsx`).
+  - The feature tour is then held while scrolling steps through its four views, with the dashboard's view change (the notch pill resizes with Flip, the old view leaves upwards, bars grow, rows arrive). Clicking a tab switches at once and glides the page to that view's place. No auto-advance.
+  - Narrower screens hold nothing: the hero's change plays once the photo is well in view, and the tour switches by tapping its chips.
+- Pinned sections sit directly in flex columns, so their ScrollTriggers set `pinSpacing: true` (ScrollTrigger turns it off for flex parents).
+- **Example data only**, labelled on the page. The hero's figures are facts about the product (6 stages, 4 views, 0 page loads), never invented results.
+
 ### Auth page (`/auth`)
 
 - **Layout:** the form column is on the left: wordmark, the Log in / Register pill, a left-aligned two-tone title, the form, then the account-switch line. On the right is a photo panel with LeadFlow's own cards floating over it (example data), The panel is hidden below `lg`, where the theme toggle moves into the form header.
