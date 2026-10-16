@@ -748,6 +748,7 @@ export function Tour({
 
 /** Bars rise from their baseline (clip, like the dashboard's charts). */
 function grow(els: NodeListOf<Element>, delay: number) {
+  if (!els.length) return // Follow-ups and Timeline have no bars
   gsap.fromTo(
     els,
     { clipPath: "inset(100% 0% 0% 0%)" },
