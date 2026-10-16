@@ -88,14 +88,29 @@ export function Hero({
         ({ conditions }) => {
           if (!conditions?.motion) return
           const [big] = q("[data-big]")
+          // Explicit start values throughout (fromTo, not to): a refresh
+          // re-records a to()'s start wherever the timeline happens to be
+          // rendered while measuring, which can freeze it at its end state.
           const shared = (tl: gsap.core.Timeline, at: number) =>
             tl
-              .to(
+              .fromTo(
                 q("[data-glass]"),
+                { autoAlpha: 1, y: 0 },
                 { autoAlpha: 0, y: -16, duration: 0.2 },
                 at
               )
-              .to(q("[data-photo]"), { autoAlpha: 0, duration: 0.3 }, at + 0.2)
+              .fromTo(
+                q("[data-photo]"),
+                { autoAlpha: 1 },
+                { autoAlpha: 0, duration: 0.3 },
+                at + 0.2
+              )
+              .fromTo(
+                stage,
+                { "--edge": 1 },
+                { "--edge": 0, duration: 0.3 },
+                at + 0.2
+              )
               .fromTo(
                 q("[data-dash-text]"),
                 { y: 24, autoAlpha: 0 },
@@ -142,8 +157,9 @@ export function Hero({
               invalidateOnRefresh: true,
             },
           })
-          tl.to(
+          tl.fromTo(
             q("[data-copy]"),
+            { x: 0, autoAlpha: 1 },
             { x: -56, autoAlpha: 0, duration: 0.3, ease: "power1.in" },
             0
           )
@@ -153,7 +169,7 @@ export function Hero({
           // render, including a refresh restoring the scroll, sets it right.
           const lift = { duration: 0.3, ease: "power2.inOut" }
           const inset = (b: number, l: number) =>
-            `inset(0px 0px ${b}px ${l}px round 32px)`
+            `inset(0px 0px ${b}px ${l}px round 34px)`
           tl.fromTo(
             q("[data-panel]"),
             { clipPath: () => inset(0, half()) },
@@ -164,9 +180,14 @@ export function Hero({
             },
             0.05
           )
-            .to(
+            .fromTo(
               q("[data-panel]"),
-              { clipPath: () => inset(rowH(), 86), ...lift },
+              { clipPath: inset(0, 86) },
+              {
+                clipPath: () => inset(rowH(), 86),
+                ...lift,
+                immediateRender: false, // the first clip tween owns the start
+              },
               0.5
             )
             .fromTo(
@@ -227,6 +248,15 @@ export function Hero({
       <div
         data-stage
         className="relative flex h-full flex-col gap-2.5 [--row:clamp(230px,36%,330px)] lg:block lg:overflow-hidden"
+        // The photo's subtle orange edge (as on /auth): brand orange mixed
+        // into the card colour, faded out (--edge) as the photo goes.
+        style={
+          {
+            "--edge": 1,
+            "--photo-edge":
+              "color-mix(in oklch, color-mix(in oklch, var(--primary) 55%, var(--card)) calc(var(--edge) * 100%), transparent)",
+          } as React.CSSProperties
+        }
       >
         <Copy signedIn={signedIn} />
         <Rail />
@@ -242,6 +272,7 @@ export function Hero({
               padding), or the square corner pokes past the curve. */}
           <Notch
             corner="tr"
+            edge
             className="pointer-events-auto z-10 rounded-tr-[34px]"
           >
             <span ref={slotRef} className="block h-16 w-[178px]" />
@@ -252,7 +283,7 @@ export function Hero({
             className="pointer-events-auto absolute bottom-0 left-0 z-10 lg:left-[calc(50%+5px)]"
           >
             {/* In the card's corner on narrow screens (stacked). */}
-            <Notch corner="bl" className="max-lg:rounded-bl-[34px]">
+            <Notch corner="bl" edge className="max-lg:rounded-bl-[34px]">
               <TodayCard left={left} />
             </Notch>
           </div>
@@ -591,7 +622,7 @@ function Panel(props: FilterProps) {
         )
       }}
       onMouseLeave={() => drift.current?.(0, 0)}
-      className="dark pointer-events-auto absolute inset-0 overflow-hidden rounded-xl bg-background text-foreground lg:[clip-path:inset(0px_0px_0px_calc(50%+5px)_round_32px)]"
+      className="dark pointer-events-auto absolute inset-0 overflow-hidden rounded-[34px] bg-background text-foreground lg:[clip-path:inset(0px_0px_0px_calc(50%+5px)_round_34px)]"
     >
       <Dashboard {...props} />
       <div data-photo className="absolute inset-0 lg:left-[calc(50%+5px)]">
@@ -603,6 +634,10 @@ function Panel(props: FilterProps) {
           placeholder="blur"
           sizes="(min-width: 1024px) 50vw, 100vw"
           className="object-cover object-[center_20%]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-[34px] ring-2 ring-(--photo-edge) ring-inset"
         />
       </div>
       <div
