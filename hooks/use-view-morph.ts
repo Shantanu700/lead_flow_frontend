@@ -171,11 +171,15 @@ export function useViewMorph({
       const g = ghosts.current.get(key)
       if (!g) return
       ghosts.current.delete(key)
+      // Also on interrupt: a tab switch that lands mid-roll reverts the
+      // entrance's tweens, which would leave this copy stuck on <body>.
+      const remove = () => g.node.remove()
       gsap.to(g.node.firstElementChild, {
         yPercent: -100,
         duration: 0.45,
         ease: "power3.inOut",
-        onComplete: () => g.node.remove(),
+        onComplete: remove,
+        onInterrupt: remove,
       })
     }
     contentRef.current
