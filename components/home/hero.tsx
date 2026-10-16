@@ -117,7 +117,7 @@ export function Hero({
             defaults: { ease: "none" },
             scrollTrigger: {
               trigger: root.current,
-              start: "top 28px",
+              start: "top 8px",
               end: "+=1500",
               pin: true,
               // Its parent is a flex column, where ScrollTrigger skips the
@@ -176,7 +176,7 @@ export function Hero({
     <section
       id="top"
       ref={root}
-      className="w-full max-w-[1320px] rounded-[44px] bg-card p-2.5 shadow-card lg:h-[clamp(620px,calc(100svh-56px),820px)]"
+      className="w-full rounded-[44px] bg-card p-2.5 lg:h-[max(620px,calc(100svh-16px))]"
     >
       <div
         data-stage
@@ -191,7 +191,12 @@ export function Hero({
           <Panel />
           {/* Top right: the theme and Log in buttons sit here until the
               header takes them. */}
-          <Notch corner="tr" className="pointer-events-auto z-10">
+          {/* Its outer corner follows the card's (44px less the 10px
+              padding), or the square corner pokes past the curve. */}
+          <Notch
+            corner="tr"
+            className="pointer-events-auto z-10 rounded-tr-[34px]"
+          >
             <span ref={slotRef} className="block h-16 w-[178px]" />
           </Notch>
           {/* Bottom left: moves with the panel's left edge. */}
@@ -199,7 +204,8 @@ export function Hero({
             data-bl
             className="pointer-events-auto absolute bottom-0 left-0 z-10 lg:left-[calc(50%+5px)]"
           >
-            <Notch corner="bl">
+            {/* In the card's corner on narrow screens (stacked). */}
+            <Notch corner="bl" className="max-lg:rounded-bl-[34px]">
               <TodayCard left={left} />
             </Notch>
           </div>

@@ -188,7 +188,7 @@ export function Home() {
   return (
     <div
       ref={root}
-      className="flex min-h-svh flex-col items-center gap-2.5 bg-background px-3 pt-3 pb-10 text-foreground sm:px-7 sm:pt-7"
+      className="flex min-h-svh flex-col gap-2 bg-black p-2 text-foreground"
     >
       <header
         ref={header}
@@ -260,7 +260,7 @@ export function Home() {
 
       <section
         id="features"
-        className="flex w-full max-w-[1320px] flex-col gap-2.5 rounded-[44px] bg-card p-2.5 shadow-card"
+        className="flex w-full flex-col gap-2.5 rounded-[44px] bg-card p-2.5"
       >
         <div className="flex flex-wrap items-end justify-between gap-6 px-5 pt-8 pb-4 sm:px-11 sm:pt-10 sm:pb-6">
           <h2
@@ -295,10 +295,7 @@ export function Home() {
         </div>
       </section>
 
-      <section
-        id="start"
-        className="w-full max-w-[1320px] rounded-[44px] bg-card p-2.5 shadow-card"
-      >
+      <section id="start" className="w-full rounded-[44px] bg-card p-2.5">
         {/* The notch is outside the .dark panel, so it keeps the card's
             colour and reads as a cut-out. */}
         <div className="relative min-h-[420px] sm:min-h-[380px]">

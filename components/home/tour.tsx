@@ -64,8 +64,8 @@ export function Tour({
         )
         st.current = ScrollTrigger.create({
           trigger: root.current,
-          // Centred below the floating header.
-          start: "center center+=36",
+          // Just below the floating header, filling the rest of the screen.
+          start: "top 84px",
           end: "+=1800",
           pin: true,
           pinSpacing: true, // the parent is a flex column (see hero.tsx)
@@ -191,7 +191,7 @@ export function Tour({
   return (
     <div
       ref={root}
-      className="grid min-w-0 gap-2.5 lg:h-[min(600px,calc(100svh-120px))] lg:grid-cols-[minmax(300px,380px)_1fr]"
+      className="grid min-w-0 gap-2.5 lg:h-[max(520px,calc(100svh-100px))] lg:grid-cols-[minmax(300px,380px)_1fr]"
     >
       <div
         role="tablist"

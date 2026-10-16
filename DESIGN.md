@@ -84,7 +84,7 @@ The dashboard follows its claude.ai/design file and is the one place with its ow
 
 ### Landing page (`/`)
 
-- **Sections** are `bg-card` cards (`rounded-[44px] p-2.5 shadow-card`, max 1320px) on the canvas, 10px apart, like the dashboard frame: the hero, Features (the tour and three hover cards), and Get started with the footer.
+- **Sections** are full-width `bg-card` cards (`rounded-[44px] p-2.5`) on a black bezel (`bg-black p-2`, 8px apart), like the dashboard frame: the hero (exactly one screen tall on wide screens), Features (the tour, which fills the screen below the header while held, and three hover cards), and Get started with the footer.
 - **Notches** hold the controls, as on the dashboard: the hero photo's top-right notch has the theme toggle and Log in, its bottom-left notch today's follow-ups; the tour's preview names the active view in its top-left notch; Get started puts its two links in a bottom-right notch. A notch over a `.dark` panel must sit outside the `.dark` element so it keeps the card colour.
 - **Scroll story** (GSAP ScrollTrigger, wide screens):
   - The hero is held on screen while it becomes the dashboard (scrubbed): the copy slides away, the panel's clip opens from the right half to the rail, the photo fades to the dark hero, the rail slides in, the figures count up and the tiles grow. The top-right notch stays put.
