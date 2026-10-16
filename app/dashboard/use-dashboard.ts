@@ -204,7 +204,14 @@ export function useDashboard() {
     )
   }
   // After a save: refresh what the open tab shows (stats, follow-up lists).
-  const refresh = () => void load(view)
+  // Saves call it after an await, when the tab, filter or page they closed
+  // over may be out of date, so it runs the latest render's load for the tab
+  // on screen or on its way in.
+  const latestRefresh = React.useRef(() => {})
+  React.useEffect(() => {
+    latestRefresh.current = () => void load(nav)
+  })
+  const refresh = () => latestRefresh.current()
 
   // First data, then the entrance plays (the view effect waits for `ready`).
   // Deferred a tick: React's dev double-mount cancels the first timer, so
