@@ -13,11 +13,10 @@ import { Logo } from "@/components/logo"
 import { Notch } from "@/components/notch"
 import { useThemeToggle } from "@/components/theme-provider"
 import { reduceMotion } from "@/lib/motion"
-import { cn } from "@/lib/utils"
 import { getCoreLogin } from "@/src/client/sdk.gen"
 import { FOLLOWS } from "./data"
 import { ArrowLink, Hero } from "./hero"
-import { countUp, scrollToId } from "./motion"
+import { Line, countUp, scrollToId } from "./motion"
 import { Tour } from "./tour"
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
@@ -132,9 +131,30 @@ export function Home() {
       ScrollTrigger.addEventListener("refresh", update)
       // Font swaps move things: measure again once the text is final.
       document.fonts?.ready.then(() => ScrollTrigger.refresh())
+      // A reload keeps your place. The browser's own restoring runs before
+      // the held sections add their scroll space, so it lands short; the
+      // page restores the position itself once its layout is final.
+      history.scrollRestoration = "manual"
+      const KEY = "home-scroll"
+      let saved = 0
+      try {
+        saved = Number(sessionStorage.getItem(KEY) ?? 0)
+      } catch {} // storage blocked: start at the top
+      if (saved) {
+        ScrollTrigger.refresh()
+        window.scrollTo(0, saved)
+      }
+      const save = () => {
+        try {
+          sessionStorage.setItem(KEY, String(window.scrollY))
+        } catch {}
+      }
+      window.addEventListener("pagehide", save)
       return () => {
         window.removeEventListener("scroll", update)
         ScrollTrigger.removeEventListener("refresh", update)
+        window.removeEventListener("pagehide", save)
+        save() // leaving for /auth or /dashboard: come back to the same place
       }
     },
     { scope: root }
@@ -258,41 +278,17 @@ export function Home() {
         signedIn={signedIn}
       />
 
-      <section
-        id="features"
-        className="flex w-full flex-col gap-2.5 rounded-[44px] bg-card p-2.5"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-6 px-5 pt-8 pb-4 sm:px-11 sm:pt-10 sm:pb-6">
-          <h2
-            data-reveal
-            className="m-0 text-[32px] leading-[1.1] font-light tracking-[-0.02em] sm:text-[46px]"
-          >
-            <Line>One screen for the whole day</Line>
-            <Line muted>Four views, no page loads.</Line>
-          </h2>
-          <p
-            data-reveal
-            className="m-0 max-w-[360px] text-[15px] leading-[1.55] text-muted-foreground"
-          >
-            Pick a view, or keep scrolling. Everything below is example data and
-            nothing is saved.
-          </p>
-        </div>
+      <Tour
+        done={done}
+        toggleDone={(i) => setDone((d) => d.map((x, k) => (k === i ? !x : x)))}
+      />
 
-        <Tour
-          done={done}
-          toggleDone={(i) =>
-            setDone((d) => d.map((x, k) => (k === i ? !x : x)))
-          }
-        />
-
-        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
-          {CARDS.map(({ Icon, title, body }) => (
-            <SpotCard key={title} title={title} body={body}>
-              <Icon size={20} strokeWidth={1.75} />
-            </SpotCard>
-          ))}
-        </div>
+      <section className="grid w-full grid-cols-1 gap-2.5 rounded-[44px] bg-card p-2.5 md:grid-cols-3">
+        {CARDS.map(({ Icon, title, body }) => (
+          <SpotCard key={title} title={title} body={body}>
+            <Icon size={20} strokeWidth={1.75} />
+          </SpotCard>
+        ))}
       </section>
 
       <section id="start" className="w-full rounded-[44px] bg-card p-2.5">
@@ -366,17 +362,6 @@ export function Home() {
         </footer>
       </section>
     </div>
-  )
-}
-
-/** One line of a two-tone title, inside the mask it rolls up through. */
-function Line({ muted, children }: { muted?: boolean; children: string }) {
-  return (
-    <span className="block overflow-hidden pb-[0.08em]">
-      <span data-line className={cn("block", muted && "text-muted-foreground")}>
-        {children}
-      </span>
-    </span>
   )
 }
 

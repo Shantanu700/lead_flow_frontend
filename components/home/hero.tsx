@@ -148,25 +148,26 @@ export function Hero({
             0
           )
           // The panel's clip: its left edge opens to the rail, then its bottom
-          // rises to make room for the dashboard's lower row of panels.
-          const [panel] = q("[data-panel]")
-          const clip = { l: 0, b: 0 }
-          const setClip = () =>
-            gsap.set(panel, {
-              clipPath: `inset(0px 0px ${clip.b}px ${clip.l}px round 32px)`,
-            })
+          // rises to make room for the dashboard's lower row of panels. Real
+          // tweens on the element (not a proxy written in onUpdate), so any
+          // render, including a refresh restoring the scroll, sets it right.
           const lift = { duration: 0.3, ease: "power2.inOut" }
+          const inset = (b: number, l: number) =>
+            `inset(0px 0px ${b}px ${l}px round 32px)`
           tl.fromTo(
-            clip,
-            { l: () => half() },
-            { l: 86, duration: 0.45, ease: "power2.inOut", onUpdate: setClip },
+            q("[data-panel]"),
+            { clipPath: () => inset(0, half()) },
+            {
+              clipPath: inset(0, 86),
+              duration: 0.45,
+              ease: "power2.inOut",
+            },
             0.05
           )
-            .fromTo(
-              clip,
-              { b: 0 },
-              { b: () => rowH(), ...lift, onUpdate: setClip },
-              0.42
+            .to(
+              q("[data-panel]"),
+              { clipPath: () => inset(rowH(), 86), ...lift },
+              0.5
             )
             .fromTo(
               q("[data-bl]"),
@@ -179,7 +180,7 @@ export function Hero({
               q("[data-bl]"),
               { y: 0 },
               { y: () => -rowH(), ...lift },
-              0.42
+              0.5
             )
             .fromTo(
               q("[data-row] > *"),
@@ -191,7 +192,7 @@ export function Hero({
                 duration: 0.3,
                 ease: "power3.out",
               },
-              0.56
+              0.62
             )
             .fromTo(
               q("[data-rail]"),

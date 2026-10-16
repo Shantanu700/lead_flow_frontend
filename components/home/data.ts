@@ -103,6 +103,12 @@ export const TIMELINE: [title: string, meta: string, Status][] = [
   ["Added as a lead", "From website form · 2 Oct", "New"],
   ["First call", "Interested in the team plan · 4 Oct", "Contacted"],
   ["Qualified", "Budget confirmed · 8 Oct", "Qualified"],
+  ["Demo booked", "Thursday, 3 pm, with their ops lead · 9 Oct", "Qualified"],
+  [
+    "Pricing questions",
+    "Wants annual billing for 12 seats · 11 Oct",
+    "Qualified",
+  ],
   ["Proposal sent", "₹48,000 · 13 Oct", "Proposal Sent"],
 ]
 
@@ -126,3 +132,35 @@ export const TABS = [
 ] as const
 
 export { DOT }
+
+/** Reports view: revenue won per bar for each period, deals and win rate. */
+export const REPORTS = {
+  Week: { bars: WEEK, deals: 4, winRate: 50 },
+  Month: {
+    bars: [
+      ["W1", 6200],
+      ["W2", 9800],
+      ["W3", 4100],
+      ["W4", 11300],
+    ] as [string, number][],
+    deals: 12,
+    winRate: 46,
+  },
+  Quarter: {
+    bars: [
+      ["Aug", 28400],
+      ["Sep", 35100],
+      ["Oct", 31400],
+    ] as [string, number][],
+    deals: 33,
+    winRate: 44,
+  },
+}
+export type Period = keyof typeof REPORTS
+
+/** The follow-ups view's overdue card. */
+export const OVERDUE = {
+  name: "Arjun Nair",
+  company: "Fernbridge",
+  note: "Was due 2 days ago · asked for a revised quote",
+} as const

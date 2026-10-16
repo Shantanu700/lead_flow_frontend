@@ -65,6 +65,24 @@ export function Roll({
   )
 }
 
+/** One line of a two-tone title, inside the mask it rolls up through as it
+ *  comes into view (home.tsx's reveal). */
+export function Line({
+  muted,
+  children,
+}: {
+  muted?: boolean
+  children: string
+}) {
+  return (
+    <span className="block overflow-hidden pb-[0.08em]">
+      <span data-line className={cn("block", muted && "text-muted-foreground")}>
+        {children}
+      </span>
+    </span>
+  )
+}
+
 /** Glide to a section, clear of the floating header. Not CSS smooth
  *  scrolling: that fights ScrollTrigger's own scroll restoring. */
 export function scrollToId(id: string) {
