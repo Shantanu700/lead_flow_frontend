@@ -6,18 +6,21 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { useGSAP } from "@gsap/react"
 import gsap from "gsap"
+import { Flip } from "gsap/Flip"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 import { Notch } from "@/components/notch"
 import { Logo } from "@/components/logo"
 import { NAV, ic } from "@/components/dashboard/icons"
 import { money } from "@/lib/format"
+import type { Status } from "@/lib/leads"
+import { reduceMotion } from "@/lib/motion"
 import { cn } from "@/lib/utils"
 import teamPhoto from "@/public/auth/team.jpg"
-import { DOT, FOLLOWS, LIVE, STAGE_COUNTS } from "./data"
+import { DOT, EXAMPLE_LEADS, FOLLOWS, LIVE, STAGE_COUNTS } from "./data"
 import { Roll, countUp, scrollToId } from "./motion"
 
-gsap.registerPlugin(useGSAP, ScrollTrigger)
+gsap.registerPlugin(useGSAP, Flip, ScrollTrigger)
 
 // What the product is, not invented results.
 const FACTS = [
@@ -58,6 +61,16 @@ export function Hero({
   signedIn: boolean
 }) {
   const root = React.useRef<HTMLElement>(null)
+  // The finished dashboard's status filter: its chips and its tiles.
+  const [filter, setFilter] = React.useState<Filter>("All")
+  // Where the chip highlight and leads rows were before a change, for Flip.
+  const flipFrom = React.useRef<Flip.FlipState | null>(null)
+  const pick = (f: Filter) => {
+    if (f === filter) return
+    const els = root.current?.querySelectorAll("[data-row] [data-flip-id]")
+    if (els?.length && !reduceMotion()) flipFrom.current = Flip.getState(els)
+    setFilter(f)
+  }
 
   useGSAP(
     () => {
@@ -220,8 +233,8 @@ export function Hero({
           data-panel-wrap
           className="pointer-events-none relative min-h-[600px] animate-in delay-150 duration-700 ease-out fade-in-0 fill-mode-both motion-reduce:animate-none lg:absolute lg:inset-0 lg:min-h-0"
         >
-          <Panel />
-          <LowerRow />
+          <Panel filter={filter} setFilter={pick} />
+          <LowerRow filter={filter} setFilter={pick} flipFromRef={flipFrom} />
           {/* Top right: the theme and Log in buttons sit here until the
               header takes them. */}
           {/* Its outer corner follows the card's (44px less the 10px
@@ -361,49 +374,85 @@ export function ArrowLink({
   )
 }
 
-const ROWS = LIVE.map((l, i) => ({
-  name: l.name,
-  company: l.company,
-  value: l.value,
-  status: (["Proposal Sent", "Qualified", "New", "Contacted"] as const)[i],
-}))
+const COUNT = Object.fromEntries(STAGE_COUNTS) as Record<Status, number>
 const TOTAL = STAGE_COUNTS.reduce((a, [, n]) => a + n, 0)
 
 /** Wide screens: the dashboard's lower row (the leads card and the orange
- *  filter card), rising in under the finished hero. Example data. */
-function LowerRow() {
+ *  filter card), rising in under the finished hero. Picking a status works
+ *  as on the dashboard: the dark highlight slides to the chip, the count
+ *  and the card's subtitle roll, and the rows glide to the new list while
+ *  new ones fade in. Example data. */
+function LowerRow({
+  filter,
+  setFilter,
+  flipFromRef,
+}: FilterProps & { flipFromRef: React.RefObject<Flip.FlipState | null> }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const rows = EXAMPLE_LEADS.filter(
+    ([, , status]) => filter === "All" || status === filter
+  )
+
+  useGSAP(
+    () => {
+      const from = flipFromRef.current
+      flipFromRef.current = null
+      if (!from) return
+      Flip.from(from, {
+        targets: ref.current!.querySelectorAll("[data-flip-id]"),
+        duration: 0.4,
+        ease: "power3.inOut",
+        onEnter: (els) =>
+          gsap.fromTo(
+            els,
+            { autoAlpha: 0, y: 10 },
+            { autoAlpha: 1, y: 0, duration: 0.3, delay: 0.12, stagger: 0.04 }
+          ),
+      })
+    },
+    { scope: ref, dependencies: [filter] }
+  )
+
   return (
     <div
+      ref={ref}
       data-row
-      aria-hidden
-      className="absolute right-0 bottom-0 left-[86px] hidden h-(--row) gap-2.5 lg:flex"
+      className="pointer-events-auto absolute right-0 bottom-0 left-[86px] hidden h-(--row) gap-2.5 lg:flex"
     >
       <div className="invisible flex min-w-0 flex-1 flex-col gap-3.5 overflow-hidden rounded-[32px] bg-background p-6">
         <h3 className="m-0 text-2xl leading-[1.2] font-light">
           Leads
-          <span className="block text-muted-foreground">All statuses</span>
+          <Roll
+            text={filter === "All" ? "All statuses" : filter}
+            className="grid! text-muted-foreground"
+          />
         </h3>
         <div className="flex min-h-0 flex-col gap-1.5">
-          {ROWS.map((r) => (
+          {rows.map(([name, company, status, value]) => (
             <div
-              key={r.name}
-              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-[18px] bg-card px-4 py-2.5"
+              key={name}
+              data-flip-id={"row-" + name}
+              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-[18px] bg-card px-4 py-2.5 transition-colors hover:bg-secondary"
             >
               <span className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium">{r.name}</span>
+                <span className="truncate text-sm font-medium">{name}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {r.company}
+                  {company}
                 </span>
               </span>
-              <span className="flex items-center gap-1.5 justify-self-start rounded-full bg-secondary px-2.5 py-[3px] text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setFilter(filter === status ? "All" : status)}
+                className="flex cursor-pointer items-center gap-1.5 justify-self-start rounded-full border-0 bg-secondary px-2.5 py-[3px] text-xs font-medium text-foreground transition-colors hover:bg-foreground hover:text-background"
+                title={`Show ${status} leads`}
+              >
                 <span
                   className="size-2 rounded-full"
-                  style={{ background: DOT[r.status] }}
+                  style={{ background: DOT[status] }}
                 />
-                {r.status}
-              </span>
+                {status}
+              </button>
               <span className="text-[15px] font-light tabular-nums">
-                {money(r.value)}
+                {money(value)}
               </span>
             </div>
           ))}
@@ -415,24 +464,53 @@ function LowerRow() {
             Filter
             <span className="block text-brand-ink/70">By status</span>
           </h3>
-          <span className="text-sm">{TOTAL} shown</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full bg-brand-ink px-3 py-1.5 text-[13px] font-medium text-white">
-            All {TOTAL}
+          <span className="text-sm tabular-nums">
+            <Roll text={String(filter === "All" ? TOTAL : COUNT[filter])} />{" "}
+            shown
           </span>
-          {STAGE_COUNTS.map(([name, n]) => (
-            <span
-              key={name}
-              className="flex items-center gap-1.5 rounded-full border border-brand-ink/25 px-3 py-1.5 text-[13px] font-medium"
-            >
-              <span
-                className="size-2 rounded-full"
-                style={{ background: DOT[name] }}
-              />
-              {name} {n}
-            </span>
-          ))}
+        </div>
+        <div
+          role="group"
+          aria-label="Filter leads by status"
+          className="flex flex-wrap gap-1.5"
+        >
+          {(["All", ...STAGE_COUNTS.map(([name]) => name)] as Filter[]).map(
+            (name) => {
+              const on = filter === name
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setFilter(name)}
+                  className={cn(
+                    "relative flex cursor-pointer items-center gap-1.5 rounded-full border border-brand-ink/25 bg-transparent px-3 py-1.5 text-[13px] font-medium transition-colors duration-200",
+                    on
+                      ? "border-transparent text-white"
+                      : "text-brand-ink hover:bg-brand-ink/10"
+                  )}
+                >
+                  {/* One dark highlight; Flip slides it between chips. */}
+                  {on && (
+                    <span
+                      data-flip-id="chip"
+                      aria-hidden
+                      className="absolute inset-0 rounded-full bg-brand-ink"
+                    />
+                  )}
+                  {name !== "All" && (
+                    <span
+                      className="relative size-2 rounded-full"
+                      style={{ background: DOT[name] }}
+                    />
+                  )}
+                  <span className="relative">
+                    {name} {name === "All" ? TOTAL : COUNT[name]}
+                  </span>
+                </button>
+              )
+            }
+          )}
         </div>
       </div>
     </div>
@@ -471,7 +549,10 @@ function Rail() {
 
 /** The photo, the glass follow-up card, and under them the dashboard the
  *  panel turns into. Wide screens clip it to the right half to start. */
-function Panel() {
+type Filter = "All" | Status
+type FilterProps = { filter: Filter; setFilter: (f: Filter) => void }
+
+function Panel(props: FilterProps) {
   const ref = React.useRef<HTMLDivElement>(null)
   const drift = React.useRef<((x: number, y: number) => void) | null>(null)
 
@@ -511,7 +592,7 @@ function Panel() {
       onMouseLeave={() => drift.current?.(0, 0)}
       className="dark pointer-events-auto absolute inset-0 overflow-hidden rounded-xl bg-background text-foreground lg:[clip-path:inset(0px_0px_0px_calc(50%+5px)_round_32px)]"
     >
-      <Dashboard />
+      <Dashboard {...props} />
       <div data-photo className="absolute inset-0 lg:left-[calc(50%+5px)]">
         <Image
           src={teamPhoto}
@@ -535,7 +616,7 @@ function Panel() {
   )
 }
 
-function Dashboard() {
+function Dashboard({ filter, setFilter }: FilterProps) {
   return (
     <div className="absolute inset-0 flex flex-col px-5 pt-24 pb-6 sm:px-9 lg:bottom-[calc(var(--row)+10px)] lg:pt-[104px] lg:pr-9 lg:pl-[122px]">
       <div className="flex flex-wrap items-start justify-between gap-6">
@@ -577,30 +658,44 @@ function Dashboard() {
         </div>
       </div>
       <div className="mt-auto mb-[84px] flex h-[170px] items-end gap-2">
-        {STAGE_COUNTS.map(([name, n]) => (
-          <span
-            key={name}
-            className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2.5"
-          >
-            <span
-              data-tile
-              className="flex min-h-12 items-start rounded-[20px] bg-card p-3 text-2xl font-light tabular-nums"
-              style={{ height: `${(n / SMAX) * 100}%` }}
-            >
-              {n}
-            </span>
-            <span
-              data-dash-text
-              className="flex items-center gap-1.5 truncate text-xs font-medium"
+        {/* Tiles filter the leads card below, like its chips. */}
+        {STAGE_COUNTS.map(([name, n]) => {
+          const sel = filter === name
+          return (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={sel}
+              aria-label={`Show ${name} leads`}
+              onClick={() => setFilter(sel ? "All" : name)}
+              className="group flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-end gap-2.5 border-0 bg-transparent p-0 text-left text-foreground"
             >
               <span
-                className="size-2 flex-none rounded-full"
-                style={{ background: DOT[name] }}
-              />
-              <span className="truncate">{name}</span>
-            </span>
-          </span>
-        ))}
+                data-tile
+                className={cn(
+                  "flex min-h-12 items-start rounded-[20px] p-3 text-2xl font-light tabular-nums transition-[background-color,opacity] duration-250",
+                  sel
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card group-hover:bg-secondary",
+                  filter !== "All" && !sel && "opacity-45"
+                )}
+                style={{ height: `${(n / SMAX) * 100}%` }}
+              >
+                {n}
+              </span>
+              <span
+                data-dash-text
+                className="flex items-center gap-1.5 truncate text-xs font-medium"
+              >
+                <span
+                  className="size-2 flex-none rounded-full"
+                  style={{ background: DOT[name] }}
+                />
+                <span className="truncate">{name}</span>
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

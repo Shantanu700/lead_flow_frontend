@@ -51,6 +51,25 @@ export const LIVE = [
   },
 ] as const
 
+/** The hero's leads card; its filter picks from these. */
+export const EXAMPLE_LEADS: [
+  name: string,
+  company: string,
+  Status,
+  value: number,
+][] = [
+  ["Priya Sharma", "Acme Corp", "Proposal Sent", 48000],
+  ["Rahul Verma", "Northwind", "Qualified", 22500],
+  ["Aisha Iqbal", "Bluefin Studio", "New", 15000],
+  ["Karan Mehta", "Orbit Labs", "Contacted", 64000],
+  ["Neha Joshi", "Lumen Labs", "Won", 52000],
+  ["Vikram Rao", "Peakline", "New", 18000],
+  ["Sara Thomas", "Kite & Co", "Contacted", 27500],
+  ["Arjun Nair", "Fernbridge", "Lost", 9000],
+  ["Meera Pillai", "Brightside", "Qualified", 36000],
+  ["Dev Malhotra", "Cobalt Works", "Won", 41000],
+]
+
 /** Leads per stage in the tour's pipeline. */
 export const STAGE_COUNTS: [Status, number][] = [
   ["New", 14],
