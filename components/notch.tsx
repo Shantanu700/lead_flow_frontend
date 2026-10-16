@@ -7,8 +7,20 @@ const R = 36
 
 type Corner = "tl" | "tr" | "br" | "bl" | "b"
 
-const fillet = (at: string, R: number) =>
-  `radial-gradient(circle at ${at}, transparent ${R - 0.5}px, var(--card) ${R}px)`
+const fillet = (at: string, R: number, edge?: boolean) =>
+  edge
+    ? // A 2px --photo-edge band on the arc, continuing a photo's edge line.
+      `radial-gradient(circle at ${at}, transparent ${R - 2}px, var(--photo-edge) ${R - 2}px, var(--photo-edge) ${R}px, var(--card) ${R + 0.5}px)`
+    : `radial-gradient(circle at ${at}, transparent ${R - 0.5}px, var(--card) ${R}px)`
+
+// The edge line along the notch's two inner sides, per corner.
+const EDGE_SHADOW: Record<Corner, string> = {
+  tl: "2px 2px 0 0 var(--photo-edge)",
+  tr: "-2px 2px 0 0 var(--photo-edge)",
+  br: "-2px -2px 0 0 var(--photo-edge)",
+  bl: "2px -2px 0 0 var(--photo-edge)",
+  b: "0 -2px 0 0 var(--photo-edge)",
+}
 
 // Each corner: the block's position, padding and rounded inner corner, plus
 // two fillets that curve the panel's edge into the notch.
@@ -100,6 +112,7 @@ export function Notch({
   corner,
   r = R,
   gap = 10,
+  edge,
   className,
   style,
   children,
@@ -110,6 +123,8 @@ export function Notch({
   r?: number
   /** Space between the panel and what the notch holds. */
   gap?: number
+  /** Continue the panel's `--photo-edge` line round the notch (as on /auth). */
+  edge?: boolean
   className?: string
   style?: React.CSSProperties
   children: React.ReactNode
@@ -119,7 +134,11 @@ export function Notch({
     <div
       data-notch={corner}
       className={cn("absolute box-border bg-card", className)}
-      style={{ ...box, ...style }}
+      style={{
+        ...box,
+        ...(edge && { boxShadow: EDGE_SHADOW[corner] }),
+        ...style,
+      }}
       {...rest}
     >
       {children}
@@ -134,7 +153,12 @@ export function Notch({
             // would otherwise widen the scroll area.
             role === "fly" && "hidden"
           )}
-          style={{ ...pos, width: r, height: r, background: fillet(at, r) }}
+          style={{
+            ...pos,
+            width: r,
+            height: r,
+            background: fillet(at, r, edge),
+          }}
         />
       ))}
     </div>

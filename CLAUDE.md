@@ -67,8 +67,8 @@ Rules:
   - `describeApiError()` turns API errors into one sentence. Errors and results are shown as Sonner toasts (`<Toaster>` is in `app/layout.tsx`).
   - The backend uses Django sessions with email login. The frontend and API are both HTTPS on `localhost`, so the browser treats them as the same site and the session cookie works.
 - **Routes:**
-  - `/auth` is a single page with a Log in / Register toggle.
+  - `/auth` is a single page with a Log in / Register toggle. `?mode=register` opens it on Register.
   - `app/dashboard/layout.tsx` is the auth guard: it calls `GET /core/login/` and sends signed-out users to `/auth`. It provides the user through `useSession()` (`components/session.tsx`).
-  - `/` redirects to `/dashboard`.
+  - `/` is the public landing page (`components/home/`): a hero that turns into the dashboard as you scroll, the notch's buttons flying into a floating header, and a four-view feature tour that is held on screen while scrolling (or clicking) steps through it. All its data is example data in `components/home/data.ts`. Signed-in visitors see "Open dashboard" instead of Log in.
   - There is no `proxy.ts`, because only the API can confirm a session.
 - Prettier settings: no semicolons, double quotes, `trailingComma: es5`. It sorts classes inside `cn(...)` and `cva(...)`.

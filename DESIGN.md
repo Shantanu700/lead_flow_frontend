@@ -82,6 +82,21 @@ The dashboard follows its claude.ai/design file and is the one place with its ow
 - Controls sit in **notches**: card-coloured cut-outs in a panel's corner with 36px fillets (`components/notch.tsx`). The sheet and dialog cut their top-right corner for a 48px close button.
 - Hero panels and the rail are `.dark` in both themes.
 
+### Landing page (`/`)
+
+- **Sections** are full-width `bg-card` cards (`rounded-[44px] p-2.5`) on a black bezel (`bg-black p-2`, 8px apart), like the dashboard frame: the hero (exactly one screen tall on wide screens), Features (itself a screen-sized card, held while scrolling steps through the tour), the three hover cards, and Get started with the footer.
+- **Notches** hold the controls, as on the dashboard: the hero photo's top-right notch has the theme toggle and Log in, its bottom-left notch today's follow-ups; the tour's preview names the active view in its top-left notch; Get started puts its two links in a bottom-right notch. A notch over a `.dark` panel must sit outside the `.dark` element so it keeps the card colour.
+- **Scroll story** (GSAP ScrollTrigger, wide screens):
+  - The hero is held on screen while it becomes the dashboard (scrubbed): the copy slides away, the panel's clip opens from the right half to the rail, the photo fades to the dark hero, the rail slides in, the figures count up and the tiles grow; then the hero's bottom rises and the dashboard's lower row (the leads card and the orange filter card) comes up under it; its status chips, the rows' status pills and the hero's tiles all filter the leads card as on the dashboard (sliding highlight, rolling count and subtitle, rows gliding), the follow-ups notch riding up with the hero's edge. The top-right notch stays put.
+  - In the last 300px of that hold the notch's buttons fly into a floating header that grows in around them, and the notch closes behind them. The buttons live in one fixed layer and are placed between the two slots by scroll (`components/home/home.tsx`).
+  - The feature tour is then held while scrolling steps through its four views, with the dashboard's view change (the notch pill resizes with Flip, the old view leaves upwards, bars grow, rows arrive). Clicking a tab switches at once and glides the page to that view's place. No auto-advance.
+  - Narrower screens hold nothing: the hero's change plays once the photo is well in view, and the tour switches by tapping its chips.
+- The hero photo has the `/auth` photo's subtle orange edge (`--photo-edge`, a 2px inset ring) and its two notches continue it (`<Notch edge>`); the edge fades out with the photo. Panels in the card's corners use 34px radii (the card's 44px less its 10px padding) so their curves are concentric with the card's and nothing peeks between them.
+- Every tween in a scrubbed timeline gets explicit start values (`fromTo`): a refresh re-records a `to()`'s start wherever the timeline was rendered while measuring.
+- Animate the hero clip with real tweens on the element, never a proxy written in `onUpdate`: ScrollTrigger renders the timeline at other positions while it measures on load, and a proxy leaves the clip stale. A reload restores the scroll position itself (`history.scrollRestoration = "manual"`), because the browser's restore runs before the pins add their space.
+- Pinned sections sit directly in flex columns, so their ScrollTriggers set `pinSpacing: true` (ScrollTrigger turns it off for flex parents).
+- **Example data only**, labelled on the page. The hero's figures are facts about the product (6 stages, 4 views, 0 page loads), never invented results.
+
 ### Auth page (`/auth`)
 
 - **Layout:** the form column is on the left: wordmark, the Log in / Register pill, a left-aligned two-tone title, the form, then the account-switch line. On the right is a photo panel with LeadFlow's own cards floating over it (example data), The panel is hidden below `lg`, where the theme toggle moves into the form header.
