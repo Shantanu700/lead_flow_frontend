@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { Flip } from "gsap/Flip"
 import { toast } from "sonner"
 
-import { ApiFailure, got, refreshCsrf, toastFailure } from "@/lib/api"
+import { got, refreshCsrf, toastFailure } from "@/lib/api"
 import { useSession } from "@/components/session"
 import { useThemeToggle } from "@/components/theme-provider"
 import {
@@ -16,33 +16,13 @@ import {
   getApiFollowUpsOverdue,
   getApiFollowUpsToday,
   getApiFollowUpsUpcoming,
-  getApiLeads,
-  getApiLeadsDiscussions,
   getApiStatsDashboard,
   getApiStatsLeads,
   getApiStatsReports,
-  postApiLeads,
-  postApiLeadsDiscussions,
   putApiLead,
 } from "@/src/client/sdk.gen"
-import type {
-  DashboardStats,
-  Discussion,
-  Lead,
-  LeadsStats,
-  PaginatedLead,
-} from "@/src/client/types.gen"
-import {
-  BLANK_FORM,
-  EMPTY_PAGE,
-  PERIOD_KEY,
-  SORT_KEY,
-  ZERO_COUNTS,
-  type Note,
-  type Period,
-  type Sort,
-  type Status,
-} from "@/lib/leads"
+import type { DashboardStats, Lead, LeadsStats } from "@/src/client/types.gen"
+import { PERIOD_KEY, ZERO_COUNTS, type Period, type Status } from "@/lib/leads"
 import { reduceMotion } from "@/lib/motion"
 import { useViewMorph } from "@/hooks/use-view-morph"
 import { useDashboardMotion } from "@/hooks/use-dashboard-motion"
@@ -50,6 +30,9 @@ import { useFrameLayout } from "@/hooks/use-frame-layout"
 import { useReports } from "@/hooks/use-reports"
 import { useFollowUpStrip } from "@/hooks/use-follow-up-strip"
 import { useOverdueCard } from "@/hooks/use-overdue-card"
+import { useLeadList } from "@/hooks/use-lead-list"
+import { useLeadSheet } from "@/hooks/use-lead-sheet"
+import { useLeadDialog } from "@/hooks/use-lead-dialog"
 
 export function useDashboard() {
   const user = useSession()
@@ -71,24 +54,10 @@ export function useDashboard() {
   // The rail highlight follows a click at once; `view` follows after the
   // exit animation.
   const [nav, setNav] = React.useState(0)
-  const [filter, setFilter] = React.useState<"All" | Status>("All")
-  const [q, setQ] = React.useState("")
-  const [pageIdx, setPage] = React.useState(0)
-  const [sheet, setSheet] = React.useState(false)
-  // The lead open in the sheet; kept here so a save that moves it off the
-  // current page doesn't empty the sheet.
-  const [selLead, setSelLead] = React.useState<Lead | null>(null)
-  const [add, setAdd] = React.useState(false)
-  const [form, setForm] = React.useState(BLANK_FORM)
-  const [note, setNote] = React.useState("")
-  const [fuOn, setFuOn] = React.useState(false)
-  const [fuAt, setFuAt] = React.useState<Date | null>(null)
-  const [sort, setSort] = React.useState<Sort>("Recent")
+  const { setList, fetchList, ...listTab } = useLeadList()
+  const { filter, q, sort, page, list, setFilter, setPage } = listTab
   // Server data. Each tab loads only what it shows (see `load`).
   const [ready, setReady] = React.useState(false)
-  // One page of the lead list, filtered, searched and sorted by the server.
-  const [list, setList] = React.useState<PaginatedLead>(EMPTY_PAGE)
-  const listSeq = React.useRef(0)
   const [dash, setDash] = React.useState<DashboardStats | null>(null)
   const [leadStats, setLeadStats] = React.useState<LeadsStats | null>(null)
   const { setReports, setPeriod, ...reportsTab } = useReports()
@@ -96,13 +65,9 @@ export function useDashboard() {
   const [today, setToday] = React.useState<Lead[]>([])
   const [overdue, setOverdue] = React.useState<Lead[]>([])
   const [upcoming, setUpcoming] = React.useState<Lead[]>([])
-  // Each lead's discussions, newest first, fetched when its sheet opens.
-  const [talk, setTalk] = React.useState<Record<number, Discussion[]>>({})
   const [saving, setSaving] = React.useState(false)
   // Command palette (search button, ⌘K / Ctrl+K).
   const [palette, setPalette] = React.useState(false)
-  // The lead dialog edits this lead; null means it adds a new one.
-  const [editLead, setEditLead] = React.useState<Lead | null>(null)
 
   // Filter change: the chip highlight's old box, and whether the list's
   // label and count should roll once the new page arrives.
@@ -115,31 +80,6 @@ export function useDashboard() {
   const rowIds = (v: number) =>
     (v === 0 || v === 1 ? list.results : []).map((l) => "lead-" + l.id)
 
-  /** Fetch the lead page tab `v` shows. The server does all the filtering,
-   *  searching and sorting: 5 rows on the Dashboard (status filter only),
-   *  10 on Leads (filter, search, sort, page). */
-  const fetchList = async (v: number) => {
-    const seq = ++listSeq.current
-    const { data, error, response } = await getApiLeads({
-      query: {
-        status: filter === "All" ? undefined : filter,
-        ...(v === 1
-          ? {
-              q: q.trim() || undefined,
-              ordering: SORT_KEY[sort],
-              page: pageIdx + 1,
-              page_size: 10,
-            }
-          : { page_size: 5 }),
-      },
-    })
-    if (seq !== listSeq.current) return // a newer request superseded this one
-    // The page ran off the end (e.g. after a status change): back to page 1.
-    if (response?.status === 404 && pageIdx > 0) return setPage(0)
-    if (error !== undefined || !data)
-      throw new ApiFailure(error, response?.status)
-    setList(data)
-  }
   /** Fetch what tab `v` shows (and nothing else). Resolves when it's in;
    *  a failure shows a toast and resolves anyway, so the tab still opens. */
   const load = (v: number, p: Period = period) => {
@@ -183,6 +123,21 @@ export function useDashboard() {
     latestRefresh.current = () => void load(nav)
   })
   const refresh = () => latestRefresh.current()
+
+  // One save at a time. Saves show only what the server confirmed; on
+  // failure the form keeps everything typed.
+  const save = async (job: () => Promise<void>) => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await job()
+      refresh()
+    } catch (error) {
+      toastFailure(error)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   // First data, then the entrance plays (the view effect waits for `ready`).
   // Deferred a tick: React's dev double-mount cancels the first timer, so
@@ -243,26 +198,7 @@ export function useDashboard() {
     month: "short",
   })
 
-  const pageCount = Math.max(1, Math.ceil(list.count / 10))
-  const page = pageIdx
-  const timeline: Note[] = selLead
-    ? [
-        ...(talk[selLead.id] ?? []).map((d) => ({
-          key: "d" + d.id,
-          at: d.created_at,
-          note: d.note,
-          follow: d.follow_up_at,
-        })),
-        {
-          key: "created",
-          at: selLead.created_at,
-          note: "Lead created",
-          system: true,
-        },
-      ]
-    : []
   const fuLeft = today.filter((l) => !l.follow_up_done_at).length
-  const filterLabel = filter === "All" ? "All statuses" : filter
   /** Leads per status from the open tab's stats ("All" sums them). */
   const countOf = (name: string, by = dash?.by_status ?? ZERO_COUNTS) =>
     name === "All"
@@ -286,7 +222,7 @@ export function useDashboard() {
     )
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- list inputs only
-  }, [filter, q, sort, pageIdx])
+  }, [filter, q, sort, page])
 
   // Today's follow-up strip on the Follow-ups tab.
   const strip = useFollowUpStrip(view)
@@ -313,51 +249,27 @@ export function useDashboard() {
     setFilter(name)
     setPage(0)
   }
-  // Put a lead the server returned into every list that shows it.
-  const merge = (lead: Lead) => {
-    const swap = (list: Lead[]) =>
-      list.map((l) => (l.id === lead.id ? lead : l))
-    setList((p) => ({ ...p, results: swap(p.results) }))
-    setSelLead((l) => (l?.id === lead.id ? lead : l))
-    setToday(swap)
-    setOverdue(swap)
-    setUpcoming(swap)
-  }
-  // Row pencil: the lead dialog, prefilled, in edit mode.
-  const openEdit = (lead: Lead) => {
-    setEditLead(lead)
-    setForm({
-      name: lead.name,
-      company: lead.company ?? "",
-      phone: lead.phone ?? "",
-      value: String(lead.value ?? 0),
-      source: lead.source ?? "",
-    })
-    setAdd(true)
-  }
-  // Header +: a blank dialog (an unsaved new-lead draft is kept).
-  const openAdd = () => {
-    if (editLead) {
-      setEditLead(null)
-      setForm(BLANK_FORM)
-    }
-    setAdd(true)
-  }
-  // `lead` when the caller already has it (the palette's results may not be
-  // in any list on screen); otherwise it's found in those lists.
-  const openLead = (id: number, lead?: Lead) => {
-    setSelLead(
-      lead ??
-        [...list.results, ...today, ...overdue, ...upcoming].find(
-          (l) => l.id === id
-        ) ??
-        null
-    )
-    setSheet(true)
-    got(getApiLeadsDiscussions({ path: { id } }), (list) =>
-      setTalk((all) => ({ ...all, [id]: list }))
-    ).catch(toastFailure)
-  }
+
+  const { merge, ...leadSheet } = useLeadSheet({
+    leads: [...list.results, ...today, ...overdue, ...upcoming],
+    mergeLists: (lead) => {
+      const swap = (list: Lead[]) =>
+        list.map((l) => (l.id === lead.id ? lead : l))
+      setList((p) => ({ ...p, results: swap(p.results) }))
+      setToday(swap)
+      setOverdue(swap)
+      setUpcoming(swap)
+    },
+    save,
+    captureRows,
+  })
+
+  const leadDialog = useLeadDialog({
+    save,
+    merge,
+    onCreated: () => pickFilter("All"),
+  })
+
   const toggleFu = async (lead: Lead) => {
     const done = !lead.follow_up_done_at
     try {
@@ -369,102 +281,6 @@ export function useDashboard() {
       refresh()
     } catch (error) {
       toastFailure(error)
-    }
-  }
-  // Saves show only what the server confirmed; on failure the form keeps
-  // everything typed. Editing sends only the fields that changed.
-  const saveLead = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name.trim() || saving) return
-    const fields = {
-      name: form.name.trim(),
-      company: form.company.trim(),
-      phone: form.phone.trim(),
-      value: Math.max(0, Math.round(Number(form.value) || 0)),
-      source: form.source,
-    }
-    const was = editLead
-    const changed = was
-      ? Object.fromEntries(
-          Object.entries(fields).filter(
-            ([k, v]) =>
-              v !== (was[k as keyof typeof fields] ?? (k === "value" ? 0 : ""))
-          )
-        )
-      : fields
-    if (was && !Object.keys(changed).length) return setAdd(false)
-    setSaving(true)
-    try {
-      if (was) {
-        await got(putApiLead({ path: { id: was.id }, body: changed }), merge)
-        toast.success("Lead updated.")
-      } else {
-        await got(postApiLeads({ body: fields }), () => {})
-        pickFilter("All")
-        toast.success("Lead saved.")
-      }
-      setForm(BLANK_FORM)
-      setEditLead(null)
-      setAdd(false)
-      refresh()
-    } catch (error) {
-      toastFailure(error)
-    } finally {
-      setSaving(false)
-    }
-  }
-  const addNote = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selLead || !note.trim() || saving) return
-    // Keep everything typed when the follow-up is incomplete.
-    if (fuOn && !fuAt) {
-      toast.warning("Pick a date and time for the follow-up.")
-      return
-    }
-    const id = selLead.id
-    setSaving(true)
-    try {
-      await got(
-        postApiLeadsDiscussions({
-          path: { id },
-          body: {
-            note: note.trim(),
-            follow_up_at: fuOn ? fuAt!.toISOString() : null,
-          },
-        }),
-        ({ discussion, lead }) => {
-          setTalk((all) => ({ ...all, [id]: [discussion, ...(all[id] ?? [])] }))
-          merge(lead)
-        }
-      )
-      setNote("")
-      setFuOn(false)
-      setFuAt(null)
-      toast.success(fuOn ? "Note and follow-up saved." : "Note added.")
-      refresh()
-    } catch (error) {
-      toastFailure(error)
-    } finally {
-      setSaving(false)
-    }
-  }
-  const setStatus = async (status: Status) => {
-    if (!selLead || status === selLead.status || saving) return
-    setSaving(true)
-    try {
-      await got(
-        putApiLead({ path: { id: selLead.id }, body: { status } }),
-        (lead) => {
-          captureRows()
-          merge(lead)
-        }
-      )
-      toast.success(`Moved to ${status}.`)
-      refresh()
-    } catch (error) {
-      toastFailure(error)
-    } finally {
-      setSaving(false)
     }
   }
   // Reports: fetch the period first, then roll the figures to it.
@@ -486,60 +302,30 @@ export function useDashboard() {
     ...reportsTab,
     ...strip,
     ...overdueCard,
+    ...listTab,
+    ...leadSheet,
+    ...leadDialog,
     view,
     nav,
-    filter,
-    setFilter,
-    q,
-    setQ,
-    setPage,
-    sheet,
-    setSheet,
-    selLead,
-    add,
-    setAdd,
-    form,
-    setForm,
-    note,
-    setNote,
-    fuOn,
-    setFuOn,
-    fuAt,
-    setFuAt,
-    sort,
-    setSort,
     ready,
-    list,
     dash,
     leadStats,
     today,
     overdue,
     upcoming,
-    talk,
     saving,
     palette,
     setPalette,
-    editLead,
     load,
     refresh,
     go,
     pending,
     todayShort,
-    pageCount,
-    page,
-    timeline,
     fuLeft,
-    filterLabel,
     countOf,
     captureRows,
     pickFilter,
-    openEdit,
-    openAdd,
-    openLead,
     toggleFu,
-    saveLead,
-    addNote,
-    setStatus,
     pickPeriod,
     counts,
     max,
