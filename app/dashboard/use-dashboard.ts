@@ -5,8 +5,6 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useGSAP } from "@gsap/react"
-import gsap from "gsap"
 import { Flip } from "gsap/Flip"
 import { toast } from "sonner"
 
@@ -33,13 +31,10 @@ import type {
   Lead,
   LeadsStats,
   PaginatedLead,
-  ReportsStats,
 } from "@/src/client/types.gen"
-import { points } from "@/lib/format"
 import {
   BLANK_FORM,
   EMPTY_PAGE,
-  EMPTY_REPORT,
   PERIOD_KEY,
   SORT_KEY,
   ZERO_COUNTS,
@@ -51,15 +46,10 @@ import {
 import { reduceMotion } from "@/lib/motion"
 import { useViewMorph } from "@/hooks/use-view-morph"
 import { useDashboardMotion } from "@/hooks/use-dashboard-motion"
-import { layoutFor } from "@/lib/layout"
-import { reportCsv } from "@/lib/report-csv"
-
-gsap.registerPlugin(useGSAP, Flip)
-
-// Dev only: reach GSAP from the browser console, e.g. slow motion with
-// gsap.globalTimeline.timeScale(0.2). Not shipped in production builds.
-if (process.env.NODE_ENV !== "production" && typeof window !== "undefined")
-  (window as unknown as { gsap: typeof gsap }).gsap = gsap
+import { useFrameLayout } from "@/hooks/use-frame-layout"
+import { useReports } from "@/hooks/use-reports"
+import { useFollowUpStrip } from "@/hooks/use-follow-up-strip"
+import { useOverdueCard } from "@/hooks/use-overdue-card"
 
 export function useDashboard() {
   const user = useSession()
@@ -76,24 +66,14 @@ export function useDashboard() {
     router.replace("/auth")
   }
   const toggleTheme = useThemeToggle()
-  const frameRef = React.useRef<HTMLDivElement>(null)
   const contentRef = React.useRef<HTMLDivElement>(null)
-  const [w, setW] = React.useState(1400)
-  // Phones (frame under 600px): the rail becomes a bottom tab bar and every
-  // view stacks and scrolls.
-  const phone = w < 600
   const [view, setView] = React.useState(0)
   // The rail highlight follows a click at once; `view` follows after the
   // exit animation.
   const [nav, setNav] = React.useState(0)
-  const [rail, setRail] = React.useState(false)
   const [filter, setFilter] = React.useState<"All" | Status>("All")
   const [q, setQ] = React.useState("")
   const [pageIdx, setPage] = React.useState(0)
-  // Today's follow-up strip: which ends it can still scroll towards.
-  const stripRef = React.useRef<HTMLDivElement>(null)
-  const [stripEdge, setStripEdge] = React.useState({ start: true, end: true })
-  const [od, setOd] = React.useState(0)
   const [sheet, setSheet] = React.useState(false)
   // The lead open in the sheet; kept here so a save that moves it off the
   // current page doesn't empty the sheet.
@@ -111,32 +91,23 @@ export function useDashboard() {
   const listSeq = React.useRef(0)
   const [dash, setDash] = React.useState<DashboardStats | null>(null)
   const [leadStats, setLeadStats] = React.useState<LeadsStats | null>(null)
-  const [reports, setReports] = React.useState<
-    Partial<Record<Period, ReportsStats>>
-  >({})
+  const { setReports, setPeriod, ...reportsTab } = useReports()
+  const { period } = reportsTab
   const [today, setToday] = React.useState<Lead[]>([])
   const [overdue, setOverdue] = React.useState<Lead[]>([])
   const [upcoming, setUpcoming] = React.useState<Lead[]>([])
   // Each lead's discussions, newest first, fetched when its sheet opens.
   const [talk, setTalk] = React.useState<Record<number, Discussion[]>>({})
   const [saving, setSaving] = React.useState(false)
-  // Export: the button shows a check for a moment after a download.
-  const [exported, setExported] = React.useState(false)
-  const exportTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
   // Command palette (search button, ⌘K / Ctrl+K).
   const [palette, setPalette] = React.useState(false)
   // The lead dialog edits this lead; null means it adds a new one.
   const [editLead, setEditLead] = React.useState<Lead | null>(null)
-  const [period, setPeriod] = React.useState<Period>("Month")
-  const [mode, setMode] = React.useState<"Count" | "Value">("Count")
 
   // Filter change: the chip highlight's old box, and whether the list's
   // label and count should roll once the new page arrives.
   const chipFrom = React.useRef<DOMRect | null>(null)
   const rollOnList = React.useRef(false)
-  // Overdue card: direction of the step in progress (-1 back, 1 forward).
-  const odDir = React.useRef(0)
-  const odRef = React.useRef<HTMLDivElement>(null)
   // Lead rows before a list change (see captureRows).
   const rowsState = React.useRef<Flip.FlipState | null>(null)
   // Ids each view renders, so the exit knows what will survive the swap.
@@ -233,15 +204,17 @@ export function useDashboard() {
     load,
   })
 
+  const { odDir, ...overdueCard } = useOverdueCard({ overdue, contextSafe })
+
   const pending = [...overdue, ...today.filter((l) => !l.follow_up_done_at)]
   // List, filter, period, overdue-card and bell animations.
   useDashboardMotion({
     contentRef,
-    odRef,
+    odRef: overdueCard.odRef,
     period,
     list,
     filter,
-    od,
+    od: overdueCard.od,
     pendingCount: pending.length,
     rollTexts,
     chipFromRef: chipFrom,
@@ -261,28 +234,8 @@ export function useDashboard() {
     return () => window.removeEventListener("keydown", onKey)
   }, [])
 
-  React.useEffect(() => {
-    const el = frameRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  // Layout breakpoints and sizes for this frame width (lib/layout.ts).
-  const {
-    cw,
-    narrow,
-    compact,
-    odW,
-    bigSize,
-    heroH,
-    heroPad,
-    btnSize,
-    stackedRows,
-    subVisible,
-    pageStyle,
-  } = layoutFor(w, rail, phone)
+  // Frame width, rail and the breakpoints and sizes from them.
+  const layout = useFrameLayout()
 
   const todayShort = new Date().toLocaleDateString("en-IN", {
     weekday: "short",
@@ -309,18 +262,6 @@ export function useDashboard() {
       ]
     : []
   const fuLeft = today.filter((l) => !l.follow_up_done_at).length
-  const rep = reports[period] ?? EMPTY_REPORT
-  const winNote =
-    rep.win_rate === null
-      ? "No closed deals yet"
-      : rep.prev_win_rate === null
-        ? `No closed deals last ${period.toLowerCase()}`
-        : rep.win_rate === rep.prev_win_rate
-          ? `Same as last ${period.toLowerCase()}`
-          : `${rep.win_rate > rep.prev_win_rate ? "Up" : "Down"} ${points(
-              Math.abs(rep.win_rate - rep.prev_win_rate)
-            )} on last ${period.toLowerCase()}`
-  const odLead = overdue[Math.min(od, overdue.length - 1)]
   const filterLabel = filter === "All" ? "All statuses" : filter
   /** Leads per status from the open tab's stats ("All" sums them). */
   const countOf = (name: string, by = dash?.by_status ?? ZERO_COUNTS) =>
@@ -346,6 +287,9 @@ export function useDashboard() {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- list inputs only
   }, [filter, q, sort, pageIdx])
+
+  // Today's follow-up strip on the Follow-ups tab.
+  const strip = useFollowUpStrip(view)
 
   // Lead rows glide to their new order when the list changes (sort, filter,
   // search, status); rows that newly appear fade in. Call before the change.
@@ -530,123 +474,28 @@ export function useDashboard() {
       setPeriod(p)
     })
 
-  const readStrip = () => {
-    const el = stripRef.current
-    if (!el) return
-    setStripEdge({
-      start: el.scrollLeft <= 1,
-      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 1,
-    })
-  }
-  // One page of tiles per press; snapping lines the result up on a tile.
-  const scrollStrip = (dir: 1 | -1) => {
-    const el = stripRef.current
-    if (!el) return
-    el.scrollBy({
-      left: dir * (el.clientWidth + 8),
-      behavior: reduceMotion() ? "auto" : "smooth",
-    })
-  }
-  // Opening Follow-ups: start the strip at the first tile still to do.
-  React.useEffect(() => {
-    const el = stripRef.current
-    if (view !== 2 || !el) return
-    const next = [...el.children].find(
-      (c) => c instanceof HTMLElement && !c.dataset.fuDone
-    ) as HTMLElement | undefined
-    el.scrollLeft = next ? next.offsetLeft - el.offsetLeft : 0
-    readStrip()
-  }, [view])
-
-  // Overdue card: the current lead slides out, then the swap (the effect
-  // slides the next one in). contextSafe so the tweens join the GSAP context.
-  const stepOd = (dir: 1 | -1) =>
-    contextSafe(() => {
-      const n = overdue.length
-      if (n < 2) return
-      const next = (Math.min(od, n - 1) + dir + n) % n
-      const el = odRef.current
-      if (reduceMotion() || !el) return setOd(next)
-      const out = {
-        opacity: 0,
-        duration: 0.12,
-        ease: "power2.out",
-        overwrite: true,
-      }
-      gsap.to(el.querySelector("[data-od-num]"), {
-        ...out,
-        yPercent: -dir * 100,
-      })
-      gsap.to(el.querySelector("[data-od-slide]"), {
-        ...out,
-        x: -dir * 24,
-        onComplete: () => {
-          odDir.current = dir
-          setOd(next)
-        },
-      })
-    })()
-
-  /** Download the selected period's report as CSV: summary, chart bars,
-   *  funnel and sources, from the report already loaded for this tab. */
-  const exportReport = () => {
-    const csv = reportCsv(rep, period)
-    // BOM so spreadsheet apps read ₹ and other UTF-8 correctly.
-    const url = URL.createObjectURL(
-      new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" })
-    )
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `leadflow-report-${PERIOD_KEY[period]}-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Report downloaded.")
-    clearTimeout(exportTimer.current)
-    setExported(true)
-    exportTimer.current = setTimeout(() => setExported(false), 1500)
-  }
-
   const counts = dash?.by_status ?? ZERO_COUNTS
   const max = Math.max(1, ...Object.values(counts))
-  const bmax = Math.max(1, ...rep.bars.map((b) => b.value))
-  const funnel = Object.fromEntries(
-    rep.funnel.map((f) => [f.status, mode === "Count" ? f.count : f.value])
-  ) as Record<Status, number>
-  const fmax = Math.max(1, ...Object.values(funnel))
 
   return {
     user,
-    router,
     logOut,
     toggleTheme,
-    frameRef,
     contentRef,
-    w,
-    setW,
-    phone,
+    ...layout,
+    ...reportsTab,
+    ...strip,
+    ...overdueCard,
     view,
-    setView,
     nav,
-    setNav,
-    rail,
-    setRail,
     filter,
     setFilter,
     q,
     setQ,
-    pageIdx,
     setPage,
-    stripRef,
-    stripEdge,
-    setStripEdge,
-    od,
-    setOd,
     sheet,
     setSheet,
     selLead,
-    setSelLead,
     add,
     setAdd,
     form,
@@ -660,75 +509,30 @@ export function useDashboard() {
     sort,
     setSort,
     ready,
-    setReady,
     list,
-    setList,
-    listSeq,
     dash,
-    setDash,
     leadStats,
-    setLeadStats,
-    reports,
-    setReports,
     today,
-    setToday,
     overdue,
-    setOverdue,
     upcoming,
-    setUpcoming,
     talk,
-    setTalk,
     saving,
-    setSaving,
-    exported,
-    setExported,
-    exportTimer,
     palette,
     setPalette,
     editLead,
-    setEditLead,
-    period,
-    setPeriod,
-    mode,
-    setMode,
-    chipFrom,
-    rollOnList,
-    odDir,
-    odRef,
-    rowsState,
-    freezeRolls,
-    rollTexts,
-    rowIds,
-    fetchList,
     load,
     refresh,
-    contextSafe,
     go,
     pending,
-    cw,
-    narrow,
-    compact,
-    odW,
-    bigSize,
-    heroH,
-    heroPad,
-    btnSize,
-    stackedRows,
-    subVisible,
-    pageStyle,
     todayShort,
     pageCount,
     page,
     timeline,
     fuLeft,
-    rep,
-    winNote,
-    odLead,
     filterLabel,
     countOf,
     captureRows,
     pickFilter,
-    merge,
     openEdit,
     openAdd,
     openLead,
@@ -737,15 +541,8 @@ export function useDashboard() {
     addNote,
     setStatus,
     pickPeriod,
-    readStrip,
-    scrollStrip,
-    stepOd,
-    exportReport,
     counts,
     max,
-    bmax,
-    funnel,
-    fmax,
   }
 }
 
