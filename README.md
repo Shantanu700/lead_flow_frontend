@@ -8,15 +8,15 @@ This repository is the **Next.js frontend**. The API lives in **[lead_flow_backe
 
 ## Screenshots
 
-| Lead drawer: timeline, status, new note with follow-up | Add lead |
-|---|---|
-| ![Lead drawer](docs/screenshots/lead-drawer.png) | ![Add lead](docs/screenshots/add-lead.png) |
-| **Leads: status filter, search, sort, paging** | **Follow-ups: today, upcoming, overdue** |
-| ![Leads](docs/screenshots/leads.png) | ![Follow-ups](docs/screenshots/follow-ups.png) |
-| **Reports: revenue, win rate, funnel, sources** | **Search palette (⌘K)** |
-| ![Reports](docs/screenshots/reports.png) | ![Search](docs/screenshots/search.png) |
-| **Dark theme** | **Sign in** |
-| ![Dark theme](docs/screenshots/dashboard-dark.png) | ![Sign in](docs/screenshots/sign-in.png) |
+| Lead drawer: timeline, status, new note with follow-up | Add lead                                       |
+| ------------------------------------------------------ | ---------------------------------------------- |
+| ![Lead drawer](docs/screenshots/lead-drawer.png)       | ![Add lead](docs/screenshots/add-lead.png)     |
+| **Leads: status filter, search, sort, paging**   | **Follow-ups: today, upcoming, overdue** |
+| ![Leads](docs/screenshots/leads.png)                   | ![Follow-ups](docs/screenshots/follow-ups.png) |
+| **Reports: revenue, win rate, funnel, sources**  | **Search palette (⌘K)**                 |
+| ![Reports](docs/screenshots/reports.png)               | ![Search](docs/screenshots/search.png)         |
+| **Dark theme**                                   | **Sign in**                              |
+| ![Dark theme](docs/screenshots/dashboard-dark.png)     | ![Sign in](docs/screenshots/sign-in.png)       |
 
 On phones the side rail becomes a bottom tab bar and every tab stacks into one scrolling column:
 
@@ -28,6 +28,7 @@ On phones the side rail becomes a bottom tab bar and every tab stacks into one s
 ## Features
 
 **Core flows (from the brief)**
+
 - **Lead list:** every lead shows its name, company, status badge, latest discussion note and how long ago it was ("2 hours ago").
 - **Status filter:** All, New, Contacted, Qualified, Proposal Sent, Won and Lost. Filtering happens on the server.
 - **Today's follow-ups:** a pinned section with each lead's company, status, last note and follow-up time. Tick a follow-up off when it's done. "Today" uses the app's timezone (Asia/Kolkata).
@@ -40,6 +41,7 @@ On phones the side rail becomes a bottom tab bar and every tab stacks into one s
 - **Errors:** saves show only what the server confirmed. A failed save shows a warning or error toast and keeps what you typed.
 
 **Beyond the brief**
+
 - **Search** by name, company, phone or latest note, from the Leads tab or the ⌘K search palette.
 - **Overdue follow-ups** highlighted on the dashboard (a card you can step through) and on the Follow-ups tab.
 - **Sorting and paging:** by recent activity, value or name.
@@ -51,13 +53,13 @@ On phones the side rail becomes a bottom tab bar and every tab stacks into one s
 
 ## Tech stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | Next.js 16 (App Router), React 19, TypeScript |
-| UI | Tailwind CSS v4, shadcn/ui on Base UI, lucide icons, GSAP for animation, Sonner toasts |
+| Layer      | Choice                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| Frontend   | Next.js 16 (App Router), React 19, TypeScript                                              |
+| UI         | Tailwind CSS v4, shadcn/ui on Base UI, lucide icons, GSAP for animation, Sonner toasts     |
 | API client | Generated from the backend's OpenAPI schema with `@hey-api/openapi-ts` (`src/client/`) |
-| Backend | Django 6 + Django REST Framework, PostgreSQL 17, Redis 8, Celery (separate repo) |
-| Auth | Email and password with a Django session cookie; both servers run over HTTPS on localhost |
+| Backend    | Django 6 + Django REST Framework, PostgreSQL 17, Redis 8, Celery (separate repo)           |
+| Auth       | Email and password with a Django session cookie; both servers run over HTTPS on localhost  |
 
 The brief preferred Next.js with a Python backend; Django REST Framework was used for its built-in auth, admin and migrations.
 
@@ -93,6 +95,7 @@ The brief preferred Next.js with a Python backend; Django REST Framework was use
    docker compose -f docker/dev/docker-compose.yml up -d --build
    docker logs -f leadflow_dev_web   # wait for "Starting development server", then Ctrl+C
    ```
+
    The first start creates the database, runs the migrations, loads sample data and prints the demo login (`demo@example.com` and its password; set `DEMO_PASSWORD` in `.env` beforehand to choose it). The API is at https://localhost:8011, with docs at https://localhost:8011/api/schema/swagger-ui/.
 4. **Start the frontend** (in a second terminal, from the `leadflow` folder):
    ```bash
@@ -107,8 +110,8 @@ The brief preferred Next.js with a Python backend; Django REST Framework was use
 
 ### Environment variables
 
-| Variable | Where | Purpose |
-|---|---|---|
+| Variable                | Where                                  | Purpose                                                  |
+| ----------------------- | -------------------------------------- | -------------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL` | `.env.local` (from `.env.example`) | The backend API. Defaults to `https://localhost:8011`. |
 
 The backend's variables are listed in its own `.env.example`.
@@ -171,7 +174,3 @@ docs/                   SPEC.md (the brief) and screenshots
 
 - **Backend:** a pytest suite covers auth, leads, discussions, follow-ups, stats and the seed data. Run it with `docker exec leadflow_dev_web python -m pytest`.
 - **Frontend:** every change was checked with `typecheck`, `lint` and `build`, then in a real browser at desktop and phone widths with Playwright scripts. Those scripts exercised the checklist in [docs/SPEC.md](docs/SPEC.md), the save and error paths, and the animations. They were run locally and are not part of this repo.
-
-## Use of AI
-
-I built LeadFlow with the help of **[Claude Code](https://claude.com/claude-code)** (Anthropic), as the brief recommends. I designed the product and its interface, chose the stack and the API design, and directed the work feature by feature. Claude Code assisted with writing and refining the code, tests and docs. I reviewed and approved every change before it was committed. Commits it helped with carry a `Co-Authored-By: Claude` trailer.
